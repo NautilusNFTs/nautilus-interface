@@ -31,6 +31,7 @@ import { getRankings } from "../../utils/mp";
 import Grid2 from "@mui/material/Unstable_Grid2/Grid2";
 import CartNftCard from "../../components/CartNFTCard";
 import { ARC72_INDEXER_API, HIGHFORGE_API } from "../../config/arc72-idx";
+import { stripTrailingZeroBytes } from "@/utils/string";
 
 const StatContainer = styled(Stack)`
   display: flex;
@@ -419,6 +420,7 @@ export const Collection: React.FC = () => {
                   }}
                 >
                   {[
+                    /*
                     {
                       name: "Total NFTs",
                       displayValue: nfts.length,
@@ -436,7 +438,6 @@ export const Collection: React.FC = () => {
                       displayValue: collectionSales.length,
                       value: collectionSales.length,
                     },
-                    /*
                     {
                       name: "Volume",
                       displayValue:
@@ -522,7 +523,12 @@ export const Collection: React.FC = () => {
                           return (
                             <Grid2 key={el.transactionId}>
                               <CartNftCard
-                                token={el.token}
+                                token={{
+                                  ...el.token,
+                                  metadataURI: stripTrailingZeroBytes(
+                                    el.token.metadataURI
+                                  ),
+                                }}
                                 listing={el}
                                 onClick={() => {
                                   navigate(

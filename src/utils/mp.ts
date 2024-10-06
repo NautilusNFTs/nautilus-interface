@@ -1,6 +1,7 @@
 import { HIGHFORGE_CDN } from "@/config/arc72-idx";
 import { CollectionI, RankingI, Token, TokenType } from "../types";
 import { BigNumber } from "bignumber.js";
+import { stripTrailingZeroBytes } from "./string";
 
 export const computeExtraPayment = (
   price: any,
@@ -208,13 +209,15 @@ export const getRankings = (
     }
     const floorPrice = floors.get(kv[0]) || 0;
     const volume = kv[1];
-    const collectionsMissingImage = [35720076];
+    const collectionsMissingImage: number[] = [];
     const url = !collectionsMissingImage.includes(token.contractId)
-      ? `${HIGHFORGE_CDN}/i/${encodeURIComponent(token.metadataURI)}?w=240`
-      : token.metadata.image;
+      ? `${HIGHFORGE_CDN}/i/${stripTrailingZeroBytes(
+          encodeURIComponent(token.metadataURI)
+        )}?w=240`
+      : stripTrailingZeroBytes(token.metadata.image);
     return {
       collectionId: kv[0],
-      image: url,
+      image: stripTrailingZeroBytes(token.metadata.image),
       floorPrice,
       volume,
       name: `${token?.metadata?.name?.replace(/[0-9 #]*$/, "")}`,
