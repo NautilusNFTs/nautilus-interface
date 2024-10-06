@@ -1,16 +1,21 @@
 import React from "react";
-import { WalletProvider, useInitializeProviders } from "@txnlab/use-wallet";
 import { HashRouter as Router, Route, Routes } from "react-router-dom";
 import { Provider, useSelector } from "react-redux";
 import { store, persistor, RootState } from "./store/store";
 import { PersistGate } from "redux-persist/integration/react";
 import Navbar from "./components/Navbar";
 import { routes } from "./routes";
-import { getProviderInit } from "./wallets";
+import { getCurrentNodeEnv } from "./wallets";
 import { ToastContainer } from "react-toastify";
 import styled from "styled-components";
 import "react-toastify/dist/ReactToastify.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  NetworkId,
+  WalletId,
+  WalletManager,
+  WalletProvider,
+} from "@txnlab/use-wallet-react";
 
 const BackgroundLayer = styled.div`
   width: 100%;
@@ -25,6 +30,7 @@ const AppContainer: React.FC<AppContainerProps> = ({ children }) => {
   const isDarkTheme = useSelector(
     (state: RootState) => state.theme.isDarkTheme
   );
+
   return (
     <div
       style={{
@@ -38,7 +44,7 @@ const AppContainer: React.FC<AppContainerProps> = ({ children }) => {
           background: isDarkTheme ? "#161717" : "#FFFFFF",
         }}
       ></BackgroundLayer>
-      <div className="relati overflow-x-hidden h-fi" style={{   }}>
+      <div className="relati overflow-x-hidden h-fi" style={{}}>
         {children}
       </div>
     </div>
@@ -48,9 +54,44 @@ const AppContainer: React.FC<AppContainerProps> = ({ children }) => {
 const queryClient = new QueryClient();
 
 const App: React.FC = () => {
-  const providers = useInitializeProviders(getProviderInit());
+  const { ALGO_SERVER, ALGO_INDEXER_SERVER } = getCurrentNodeEnv();
+
+  // let walletConnectProjectId = import.meta.env.VITE_WALLET_CONNECT_PROJECT_ID;
+  // if (!walletConnectProjectId) {
+  //   walletConnectProjectId = "e2fef7cf17012eaba443b7cf615f7815";
+  // }
+
+  const walletManager = new WalletManager({
+    wallets: [
+      WalletId.KIBISIS,
+      {
+        id: WalletId.LUTE,
+        options: { siteName: "VoiX" },
+      },
+      // {
+      //   id: WalletId.WALLETCONNECT,
+      //   options: {
+      //     projectId: walletConnectProjectId,
+      //     metadata: {
+      //       name: "VoiX",
+      //       url: "https://staking.voi.network",
+      //       description: "Voi Staking Platform",
+      //       icons: ["https://staking.voi.network/favicon.ico"],
+      //     },
+      //     themeMode: "light",
+      //   },
+      // },
+    ],
+    algod: {
+      baseServer: ALGO_SERVER,
+      port: "",
+      token: "",
+    },
+    network: NetworkId.MAINNET,
+  });
+
   return (
-    <WalletProvider value={providers}>
+    <WalletProvider manager={walletManager}>
       <QueryClientProvider client={queryClient}>
         <Provider store={store}>
           <PersistGate loading={null} persistor={persistor}>

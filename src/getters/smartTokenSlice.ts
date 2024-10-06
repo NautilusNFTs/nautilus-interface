@@ -10,14 +10,14 @@ export interface SmartTokensState {
   error: string | null;
 }
 
-export const getSmartTokens = async() => {
+export const getSmartTokens = async () => {
   try {
     const storedTokens = await db.table("smartTokens").toArray();
     if (storedTokens.length > 0) {
       return storedTokens;
     }
     const response = await axios.get(
-      `https://arc72-idx.nautilus.sh/nft-indexer/v1/arc200/tokens?includes=all`
+      `https://mainnet-idx.nautilus.sh/nft-indexer/v1/arc200/tokens?includes=all`
     );
     const tokens = response.data.tokens;
     await db.table("smartTokens").bulkPut(
@@ -39,8 +39,7 @@ export const getSmartTokens = async() => {
     );
     return tokens;
   } catch (error: any) {
-    console.log({error});
+    console.log({ error });
     return console.error(error.message);
   }
-}
-
+};

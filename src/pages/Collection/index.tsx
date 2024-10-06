@@ -6,7 +6,6 @@ import {
   Grid,
   Skeleton,
   Stack,
-
   Typography,
 } from "@mui/material";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -31,7 +30,7 @@ import { getSmartTokens } from "../../store/smartTokenSlice";
 import { getRankings } from "../../utils/mp";
 import Grid2 from "@mui/material/Unstable_Grid2/Grid2";
 import CartNftCard from "../../components/CartNFTCard";
-import { ARC72_INDEXER_API } from "../../config/arc72-idx";
+import { ARC72_INDEXER_API, HIGHFORGE_API } from "../../config/arc72-idx";
 
 const StatContainer = styled(Stack)`
   display: flex;
@@ -99,6 +98,12 @@ const StyledLink = styled(Link)`
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
 export const Collection: React.FC = () => {
+  /* Theme */
+
+  const isDarkTheme = useSelector(
+    (state: RootState) => state.theme.isDarkTheme
+  );
+
   const dispatch = useDispatch();
 
   /* Listings */
@@ -109,11 +114,11 @@ export const Collection: React.FC = () => {
   // }, [dispatch]);
 
   /* Tokens */
-  const tokens = useSelector((state: any) => state.tokens.tokens);
-  const tokenStatus = useSelector((state: any) => state.tokens.status);
-  useEffect(() => {
-    dispatch(getTokens() as unknown as UnknownAction);
-  }, [dispatch]);
+  // const tokens = useSelector((state: any) => state.tokens.tokens);
+  // const tokenStatus = useSelector((state: any) => state.tokens.status);
+  // useEffect(() => {
+  //   dispatch(getTokens() as unknown as UnknownAction);
+  // }, [dispatch]);
 
   /* Smart Tokens */
   const smartTokens = useSelector((state: any) => state.smartTokens.tokens);
@@ -158,15 +163,18 @@ export const Collection: React.FC = () => {
   }, [dispatch]);
 
   /* Router */
+
   const { id } = useParams();
+
   const navigate = useNavigate();
 
   /* Collection Info */
+
   const [collectionInfo, setCollectionInfo] = React.useState<any>(null);
   useEffect(() => {
     try {
       axios
-        .get(`https://test-voi.api.highforge.io/projects/info/${id}`)
+        .get(`${HIGHFORGE_API}/projects/info/${id}`)
         .then((res: any) => res.data)
         .then(setCollectionInfo);
     } catch (e) {
@@ -174,10 +182,7 @@ export const Collection: React.FC = () => {
     }
   }, [id]);
 
-  /* Theme */
-  const isDarkTheme = useSelector(
-    (state: RootState) => state.theme.isDarkTheme
-  );
+  console.log("collectionInfo", collectionInfo);
 
   /* NFT Navigator Listings */
   const [listings, setListings] = React.useState<any>([]);
@@ -227,42 +232,42 @@ export const Collection: React.FC = () => {
 
   const [viewMode, setViewMode] = React.useState<"grid" | "list">("grid");
 
-  const stats: any = useMemo(() => {
-    if (
-      tokenStatus !== "succeeded" ||
-      //listingsStatus !== "succeeded" ||
-      salesStatus !== "succeeded" ||
-      collectionStatus !== "succeeded" ||
-      smartTokenStatus !== "succeeded" ||
-      !tokens ||
-      !collections ||
-      !sales ||
-      //!listings ||
-      !smartTokens
-    )
-      return null;
-    const rankings = getRankings(
-      tokens,
-      collections,
-      sales,
-      listings,
-      1,
-      smartTokens
-    );
-    return rankings.find((el: RankingI) => `${el.collectionId}` === `${id}`);
-  }, [
-    sales,
-    tokens,
-    collections,
-    //listings,
-    smartTokens,
-    id,
-    tokenStatus,
-    //listingsStatus,
-    salesStatus,
-    collectionStatus,
-    smartTokenStatus,
-  ]);
+  // const stats: any = useMemo(() => {
+  //   if (
+  //     //tokenStatus !== "succeeded" ||
+  //     //listingsStatus !== "succeeded" ||
+  //     salesStatus !== "succeeded" ||
+  //     collectionStatus !== "succeeded" ||
+  //     smartTokenStatus !== "succeeded" ||
+  //     //!tokens ||
+  //     !collections ||
+  //     !sales ||
+  //     //!listings ||
+  //     !smartTokens
+  //   )
+  //     return null;
+  //   const rankings = getRankings(
+  //     //tokens,
+  //     collections,
+  //     sales,
+  //     listings,
+  //     1,
+  //     smartTokens
+  //   );
+  //   return rankings.find((el: RankingI) => `${el.collectionId}` === `${id}`);
+  // }, [
+  //   sales,
+  //   tokens,
+  //   collections,
+  //   //listings,
+  //   smartTokens,
+  //   id,
+  //   tokenStatus,
+  //   //listingsStatus,
+  //   salesStatus,
+  //   collectionStatus,
+  //   smartTokenStatus,
+  // ]);
 
   // const [tokenPrices, setTokenPrices] = React.useState<Map<number, string>>();
   // useEffect(() => {
@@ -286,9 +291,10 @@ export const Collection: React.FC = () => {
   //   });
   // }, [listings, exchangeRate]);
 
-  const nfts = useMemo(() => {
-    return tokens?.filter((token: any) => `${token.contractId}` === `${id}`);
-  }, [tokens]);
+  const nfts: any[] = [];
+  // const nfts = useMemo(() => {
+  //   return tokens?.filter((token: any) => `${token.contractId}` === `${id}`);
+  // }, [tokens]);
 
   // const listedNfts = useMemo(() => {
   //   const listedNfts =
@@ -349,15 +355,15 @@ export const Collection: React.FC = () => {
 
   const isLoading = useMemo(
     () =>
-      tokenStatus !== "succeeded" ||
+      //tokenStatus !== "succeeded" ||
       //listingsStatus !== "succeeded" ||
       salesStatus !== "succeeded" ||
       collectionStatus !== "succeeded" ||
       smartTokenStatus !== "succeeded" ||
-      !tokens ||
+      //!tokens ||
       !collectionSales ||
       !collections ||
-      !nfts ||
+      //!nfts ||
       //!listings ||
       //!listedNfts ||
       //!listedCollections ||
@@ -367,7 +373,7 @@ export const Collection: React.FC = () => {
       nfts,
       //listings,
       //listedNfts, listedCollections,
-      stats,
+      //stats,
     ]
   );
 
@@ -377,14 +383,18 @@ export const Collection: React.FC = () => {
         <div>
           <BannerContainer
             style={{
-              backgroundImage: `url(${nfts[0].metadata.image})`,
+              backgroundImage: `url(${
+                collectionInfo?.project?.coverImageURL ||
+                nfts[0]?.metadata?.image
+              })`,
               backgroundPosition: "center",
+              backgroundSize: "cover",
             }}
           >
             <BannerTitleContainer>
               <BannerTitle>
                 {collectionInfo?.project?.title ||
-                  nfts[0].metadata.name.replace(/[0-9]*$/, "")}
+                  nfts[0]?.metadata?.name?.replace(/[0-9]*$/, "")}
               </BannerTitle>
             </BannerTitleContainer>
           </BannerContainer>
@@ -426,6 +436,7 @@ export const Collection: React.FC = () => {
                       displayValue: collectionSales.length,
                       value: collectionSales.length,
                     },
+                    /*
                     {
                       name: "Volume",
                       displayValue:
@@ -452,6 +463,7 @@ export const Collection: React.FC = () => {
                           ? stats?.volume / collectionSales.length
                           : 0,
                     },
+                    */
                   ].map((el, i) =>
                     el.value > 0 ? (
                       <Stack
@@ -522,62 +534,6 @@ export const Collection: React.FC = () => {
                           );
                         })}
                       </Grid2>
-                      {/*<Grid container spacing={2}>
-                        {listedNfts.map((el: any) => {
-                          const currency: any =
-                            `${el.listing.currency}` === "0"
-                              ? "VOI"
-                              : smartTokens.find(
-                                  (t: TokenType) =>
-                                    `${t.contractId}` ===
-                                    `${el.listing.currency}`
-                                );
-
-                          const currencySymbol =
-                            currency?.tokenId === "0"
-                              ? "VOI"
-                              : currency?.symbol || "VOI";
-                          const currencyDecimals =
-                            currency?.decimals === 0
-                              ? 0
-                              : currency?.decimals || 6;
-                          const price = new BigNumber(el.listing.price)
-                            .dividedBy(new BigNumber(10).pow(currencyDecimals))
-                            .toNumber()
-                            .toLocaleString();
-                          return (
-                            <Grid
-                              key={`${el.contractId}-${el.tokenId}`}
-                              item
-                              xs={6}
-                              md={4}
-                              xl={2}
-                            >
-                              <NftCard
-                                nftName={el.metadata.name}
-                                image={
-                                  "https://prod.cdn.highforge.io/i/" +
-                                  encodeURIComponent(el.metadataURI) +
-                                  "?w=240"
-                                }
-                                owner={el.owner}
-                                price={price}
-                                currency={currencySymbol}
-                                onClick={() => {
-                                  navigate(
-                                    `/collection/${el.contractId}/token/${el.tokenId}`
-                                  );
-                                  window.scrollTo({
-                                    top: 0,
-                                    left: 0,
-                                    behavior: "smooth",
-                                  });
-                                }}
-                              />
-                            </Grid>
-                          );
-                        })}
-                      </Grid>*/}
                     </>
                   ) : (
                     <Box sx={{ mt: 5 }}>

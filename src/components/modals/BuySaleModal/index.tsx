@@ -9,7 +9,6 @@ import {
   Grid,
   Typography,
 } from "@mui/material";
-import { useWallet } from "@txnlab/use-wallet";
 import { CONTRACT, abi, arc200 } from "ulujs";
 import { getAlgorandClients } from "../../../wallets";
 import { useDispatch, useSelector } from "react-redux";
@@ -19,6 +18,7 @@ import { NFTIndexerListingI, TokenType } from "../../../types";
 import { BigNumber } from "bignumber.js";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { useWallet } from "@txnlab/use-wallet-react";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -146,7 +146,7 @@ const BuySaleModal: React.FC<BuySaleModalProps> = ({
       });
   }, []);
 
-  const { activeAccount, signTransactions, sendTransactions } = useWallet();
+  const { activeAccount, signTransactions } = useWallet();
   const [netBalance, setNetBalance] = useState("0");
   useEffect(() => {
     if (!activeAccount || paymentAltTokenId !== "0" || !open) return;
@@ -258,7 +258,7 @@ const BuySaleModal: React.FC<BuySaleModalProps> = ({
         signTransactions(
           res.txns.map((t: string) => new Uint8Array(Buffer.from(t, "base64")))
         )
-          .then(sendTransactions)
+          //.then(sendTransactions)
           .then(() => handleClose()),
         {
           pending: "Transaction pending...",

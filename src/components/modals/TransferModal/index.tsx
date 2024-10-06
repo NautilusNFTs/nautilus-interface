@@ -9,11 +9,11 @@ import {
   Box,
   Typography,
 } from "@mui/material";
-import { useWallet } from "@txnlab/use-wallet";
 import { getAlgorandClients } from "../../../wallets";
 import { MListedNFTTokenI } from "../../../types";
 import Grid2 from "@mui/material/Unstable_Grid2/Grid2";
 import CartNftCard from "../../CartNFTCard";
+import { useWallet } from "@txnlab/use-wallet-react";
 
 interface AddressModalProps {
   open: boolean;

@@ -25,7 +25,8 @@ import BigNumber from "bignumber.js";
 import { useSelector } from "react-redux";
 import { formatter } from "../../../utils/number";
 import CartNftCard from "../../CartNFTCard";
-import { TOKEN_WVOI2 } from "../../../contants/tokens";
+import { TOKEN_WVOI } from "../../../contants/tokens";
+import { useSmartTokens } from "@/components/Navbar/hooks/collections";
 
 // function to split array into chunks
 
@@ -69,28 +70,29 @@ const ListBatchModal: React.FC<ListBatchModalProps> = ({
 
   const [showDefaultButton, setShowDefaultButton] = useState<boolean>(true);
 
-  console.log({ currency });
-
+  const { isLoading: isLoadingSmartTokens, data: smartTokens } =
+    useSmartTokens();
   useEffect(() => {
     if (currency === "0") {
       setToken(
-        smartTokens.find((token: TokenType) => token.contractId === TOKEN_WVOI2)
+        smartTokens.find((token: TokenType) => token.contractId === TOKEN_WVOI)
       );
     } else {
+      /*
       setToken(
         smartTokens.find(
           (token: TokenType) => token.contractId === Number(currency)
         )
       );
+      */
     }
-  });
-
+  }, [smartTokens, currency]);
+  /*
   const smartTokens = useSelector((state: any) => state.smartTokens.tokens);
   const smartTokenStatus = useSelector(
     (state: any) => state.smartTokens.status
   );
-  console.log({ smartTokens, smartTokenStatus, currency });
-
+  */
   const [progress, setProgress] = useState<number>(0);
 
   /* Modal */
@@ -183,31 +185,27 @@ const ListBatchModal: React.FC<ListBatchModalProps> = ({
                         return;
                       }
                       const currency = `${newValue?.contractId || "0"}`;
-                      // if (currency === "0") {
-                      //   const CTC_INFO_WVOI = 34099056;
-                      //   setCurrency(`0,${CTC_INFO_WVOI}`);
-                      // } else {
-                      setCurrency(`${newValue?.contractId}`);
-                      // }
+                      console.log({ currency });
+                      setCurrency(currency);
                     }}
                   />
                 ) : null}
               </Box>
-              <Box>
+              {/*<Box>
                 <RoyaltyCheckbox
                   defaultChecked={royalties}
                   onChange={(e) => {
                     setRoyalties(e.target.checked);
                   }}
                 />
-              </Box>
+              </Box>*/}
               <Box>
                 <Typography variant="caption">
                   {price ? (
                     <>
                       <span>
                         Listing {nfts.length} assets for sale at price {price}{" "}
-                        {token?.contractId === TOKEN_WVOI2
+                        {token?.contractId === TOKEN_WVOI
                           ? "VOI"
                           : token?.symbol}
                         .

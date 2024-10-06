@@ -14,20 +14,18 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import NFTCard from "../../components/NFTCard";
 import CartNftCard from "../../components/CartNFTCard";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import axios from "axios";
-import { stringToColorCode } from "../../utils/string";
+import { stringToColorCode, stripTrailingZeroBytes } from "../../utils/string";
 import styled from "styled-components";
 import FireplaceIcon from "@mui/icons-material/Fireplace";
 
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useCopyToClipboard } from "usehooks-ts";
 import { toast } from "react-toastify";
-import { custom, useWallet } from "@txnlab/use-wallet";
 import SendIcon from "@mui/icons-material/Send";
 import { getAlgorandClients } from "../../wallets";
 import { arc72, CONTRACT, abi, arc200, swap, mp } from "ulujs";
@@ -35,7 +33,7 @@ import TransferModal from "../../components/modals/TransferModal";
 import ListSaleModal from "../../components/modals/ListSaleModal";
 import ListAuctionModal from "../../components/modals/ListAuctionModal";
 import algosdk from "algosdk";
-import { ListingBoxCost, ctcInfoMp206 } from "../../contants/mp";
+import { ListingBoxCost, CTCINFO_MP206 } from "../../contants/mp";
 import { decodeRoyalties } from "../../utils/hf";
 import NFTListingTable from "../../components/NFTListingTable";
 import { ListingI, MListedNFTTokenI, Token, TokenType } from "../../types";
@@ -54,13 +52,14 @@ import { QUEST_ACTION, getActions, submitAction } from "../../config/quest";
 import { BigNumber } from "bignumber.js";
 import { getSmartTokens } from "../../store/smartTokenSlice";
 import ListBatchModal from "../../components/modals/ListBatchModal";
-import { TOKEN_WVOI2 } from "../../contants/tokens";
+import { TOKEN_WVOI } from "../../contants/tokens";
 import {
   useListings,
   usePrices,
   useSmartTokens,
 } from "@/components/Navbar/hooks/collections";
 import { GridLoader } from "react-spinners";
+import { useWallet } from "@txnlab/use-wallet-react";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -134,7 +133,7 @@ export const Account: React.FC = () => {
   const [viewMode, setViewMode] = React.useState<"grid" | "list">("grid");
 
   /* Wallet */
-  const { activeAccount, signTransactions, sendTransactions } = useWallet();
+  const { activeAccount, signTransactions } = useWallet();
 
   /* Copy to clipboard */
 
@@ -164,21 +163,35 @@ export const Account: React.FC = () => {
 
   const normalListings = useMemo(() => {
     if (!listings || !smartTokens) return [];
-    return listings?.map((listing: ListingI) => {
-      const paymentCurrency = smartTokens.find(
-        (st: TokenType) => `${st.contractId}` === `${listing.currency}`
-      );
-      return {
-        ...listing,
-        paymentCurrency,
-        normalPrice: 0,
-      };
-    })??[];
+    return (
+      listings?.map((listing: ListingI) => {
+        const paymentCurrency = smartTokens.find(
+          (st: TokenType) => `${st.contractId}` === `${listing.currency}`
+        );
+        return {
+          ...listing,
+          paymentCurrency,
+          normalPrice: 0,
+        };
+      }) ?? []
+    );
   }, [listings, smartTokens]);
 
   const filteredListings = useMemo(() => {
-    return normalListings;
+    return normalListings.map((listing: ListingI) => {
+      return {
+        ...listing,
+        token: {
+          ...listing.token,
+          metadataURI: stripTrailingZeroBytes(
+            listing?.token?.metadataURI || ""
+          ),
+        },
+      };
+    });
   }, [normalListings]);
+
+  console.log({ filteredListings });
 
   /* NFT Navigator Collections */
   const [collections, setCollections] = React.useState<any>(null);
@@ -233,6 +246,7 @@ export const Account: React.FC = () => {
           nfts.push({
             ...t,
             listing,
+            metadataURI: stripTrailingZeroBytes(t.metadataURI),
           });
         }
         nfts.sort((a, b) => (a.listing?.price && a.listing?.currency ? 1 : -1));
@@ -243,6 +257,7 @@ export const Account: React.FC = () => {
       console.log(e);
     }
   }, [listings]);
+  console.log({ nfts });
 
   const listedNfts = useMemo(() => {
     const listedNfts =
@@ -333,6 +348,8 @@ export const Account: React.FC = () => {
   ) => {
     if (!activeAccount || !selected.length) return;
     try {
+      console.log({ price, currency, token });
+
       setIsListing(true);
       const { algodClient, indexerClient } = getAlgorandClients();
       const selectedNfts = selected.map((i) => nfts[i]);
@@ -351,21 +368,29 @@ export const Account: React.FC = () => {
 
       // use loop but have index
 
+      const paymentToken =
+        token.contractId === TOKEN_WVOI
+          ? {
+              ...token,
+              symbol: "VOI", // symbol override
+            }
+          : token;
+
       for (let i = 0; i < selectedNfts.length; i++) {
         const nft = selectedNfts[i];
         const customR = await mp.list(
           activeAccount.address,
           nft,
           priceBi.toString(),
-          currency,
+          paymentToken,
           {
             algodClient,
             indexerClient,
             paymentTokenId,
-            wrappedNetworkTokenId: TOKEN_WVOI2,
+            wrappedNetworkTokenId: TOKEN_WVOI,
             extraTxns: [],
             enforceRoyalties: false,
-            mpContractId: ctcInfoMp206,
+            mpContractId: CTCINFO_MP206,
             listingBoxPaymentOverride: ListingBoxCost + i,
             skipEnsure: true,
           }
@@ -383,7 +408,7 @@ export const Account: React.FC = () => {
       for (let i = 0; i < buildN.length; i += chunkSize) {
         const extraTxns = buildN.slice(i, i + chunkSize).flat();
         const ci = new CONTRACT(
-          ctcInfoMp206,
+          CTCINFO_MP206,
           algodClient,
           indexerClient,
           abi.custom,
@@ -396,11 +421,12 @@ export const Account: React.FC = () => {
         ci.setExtraTxns(extraTxns.flat());
         const customR = await ci.custom();
         if (!customR.success) throw new Error(customR.error);
-        await signTransactions(
+        const stxns = await signTransactions(
           customR.txns.map(
             (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
           )
-        ).then(sendTransactions);
+        );
+        await algodClient.sendRawTransaction(stxns as Uint8Array[]).do();
         setProgress(++progress);
       }
       toast.success("Listed successfully!");
@@ -450,10 +476,10 @@ export const Account: React.FC = () => {
             algodClient,
             indexerClient,
             paymentTokenId,
-            wrappedNetworkTokenId: TOKEN_WVOI2,
+            wrappedNetworkTokenId: TOKEN_WVOI,
             extraTxns: [],
             enforceRoyalties: false,
-            mpContractId: ctcInfoMp206,
+            mpContractId: CTCINFO_MP206,
             listingBoxPaymentOverride: ListingBoxCost,
             listingsToDelete: nft.listing ? [nft.listing] : [],
             skipEnsure,
@@ -468,7 +494,7 @@ export const Account: React.FC = () => {
       if (!buildN.length) throw new Error("no transactions to simulate");
 
       const ci = new CONTRACT(
-        ctcInfoMp206,
+        CTCINFO_MP206,
         algodClient,
         indexerClient,
         abi.custom,
@@ -490,36 +516,37 @@ export const Account: React.FC = () => {
         customR.txns.map(
           (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
         )
-      ).then(sendTransactions);
+      );
+      //.then(sendTransactions);
 
       // ---------------------------------------
       // QUEST HERE
       // list nft for sale
       // ---------------------------------------
-      do {
-        const address = activeAccount.address;
-        const actions: string[] = [
-          QUEST_ACTION.SALE_LIST_ONCE,
-          QUEST_ACTION.TIMED_SALE_LIST_1MINUTE,
-          QUEST_ACTION.TIMED_SALE_LIST_15MINUTES,
-          QUEST_ACTION.TIMED_SALE_LIST_1HOUR,
-        ];
-        const {
-          data: { results },
-        } = await getActions(address);
-        for (const action of actions) {
-          const address = activeAccount.address;
-          const key = `${action}:${address}`;
-          const completedAction = results.find((el: any) => el.key === key);
-          if (!completedAction) {
-            await submitAction(action, address, {
-              contractId: nft.contractId,
-              tokenId: nft.tokenId,
-            });
-          }
-          // TODO notify quest completion here
-        }
-      } while (0);
+      // do {
+      //   const address = activeAccount.address;
+      //   const actions: string[] = [
+      //     QUEST_ACTION.SALE_LIST_ONCE,
+      //     QUEST_ACTION.TIMED_SALE_LIST_1MINUTE,
+      //     QUEST_ACTION.TIMED_SALE_LIST_15MINUTES,
+      //     QUEST_ACTION.TIMED_SALE_LIST_1HOUR,
+      //   ];
+      //   const {
+      //     data: { results },
+      //   } = await getActions(address);
+      //   for (const action of actions) {
+      //     const address = activeAccount.address;
+      //     const key = `${action}:${address}`;
+      //     const completedAction = results.find((el: any) => el.key === key);
+      //     if (!completedAction) {
+      //       await submitAction(action, address, {
+      //         contractId: nft.contractId,
+      //         tokenId: nft.tokenId,
+      //       });
+      //     }
+      //     // TODO notify quest completion here
+      //   }
+      // } while (0);
       // ---------------------------------------
 
       toast.success("Listing successful"); // show success message
@@ -537,7 +564,7 @@ export const Account: React.FC = () => {
   const handleDeleteListing = async (listingId: number) => {
     try {
       const ci = new CONTRACT(
-        ctcInfoMp206,
+        CTCINFO_MP206,
         algodClient,
         indexerClient,
         {
@@ -570,9 +597,10 @@ export const Account: React.FC = () => {
         throw new Error("a_sale_deleteListing failed in simulate");
       }
       const txns = a_sale_deleteListingR.txns;
-      await signTransactions(
+      const stxns = await signTransactions(
         txns.map((txn: string) => new Uint8Array(Buffer.from(txn, "base64")))
-      ).then(sendTransactions);
+      );
+      await algodClient.sendRawTransaction(stxns as Uint8Array[]).do();
       toast.success("Unlist successful!");
     } catch (e: any) {
       console.log(e);
@@ -724,7 +752,7 @@ export const Account: React.FC = () => {
               true
             ),
             mp: new CONTRACT(
-              ctcInfoMp206,
+              CTCINFO_MP206,
               algodClient,
               indexerClient,
               spec,
@@ -804,7 +832,8 @@ export const Account: React.FC = () => {
         const txns = customR.txns;
         const res = await signTransactions(
           txns.map((txn: string) => new Uint8Array(Buffer.from(txn, "base64")))
-        ).then(sendTransactions);
+        );
+        //.then(sendTransactions);
 
         // ---------------------------------------
         // QUEST HERE
@@ -921,7 +950,7 @@ export const Account: React.FC = () => {
           true
         ),
         mp: new CONTRACT(
-          ctcInfoMp206,
+          CTCINFO_MP206,
           algodClient,
           indexerClient,
           spec,
@@ -1000,7 +1029,8 @@ export const Account: React.FC = () => {
       const txns = customR.txns;
       const res = await signTransactions(
         txns.map((txn: string) => new Uint8Array(Buffer.from(txn, "base64")))
-      ).then(sendTransactions);
+      );
+      //.then(sendTransactions);
       toast.success(`NFT Transfer successful! Page will reload momentarily.`);
       setNfts([...nfts.slice(0, selected[0]), ...nfts.slice(selected[0] + 1)]);
       setTimeout(() => {
@@ -1045,13 +1075,13 @@ export const Account: React.FC = () => {
         ],
         events: [],
       };
-      const ci = new CONTRACT(ctcInfoMp206, algodClient, indexerClient, spec, {
+      const ci = new CONTRACT(CTCINFO_MP206, algodClient, indexerClient, spec, {
         addr: activeAccount?.address || "",
         sk: new Uint8Array(0),
       });
       const builder = {
         mp: new CONTRACT(
-          ctcInfoMp206,
+          CTCINFO_MP206,
           algodClient,
           indexerClient,
           spec,
@@ -1095,7 +1125,9 @@ export const Account: React.FC = () => {
             customR.txns.map(
               (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
             )
-          ).then(sendTransactions),
+          ).then((stxn) =>
+            algodClient.sendRawTransaction(stxn as Uint8Array[]).do()
+          ),
           {
             pending: `Txn pending to delist nfts (${(
               (Number(index) / chunks.length) *
@@ -1114,7 +1146,7 @@ export const Account: React.FC = () => {
     }
   };
 
-  return  (
+  return (
     <Layout>
       <div>
         <Stack spacing={2} direction="row">
@@ -1198,7 +1230,7 @@ export const Account: React.FC = () => {
                     View
                   </Button>
                 ) : null}
-                {selected2.length === 1 ? (
+                {/*selected2.length === 1 ? (
                   <Button
                     onClick={() => {
                       const selected = filteredListings[selected2[0]].token;
@@ -1211,7 +1243,7 @@ export const Account: React.FC = () => {
                   >
                     Update
                   </Button>
-                ) : null}
+                ) : null*/}
                 {selected2.length ? (
                   <Button onClick={handleUnlistAll}>Unlist</Button>
                 ) : null}
@@ -1278,7 +1310,7 @@ export const Account: React.FC = () => {
                     >
                       List
                     </Button>
-                    {true || selected.length === 1 ? (
+                    {false && selected.length === 1 ? (
                       <Button
                         onClick={() => {
                           setOpenTransferBatch(true);
@@ -1692,61 +1724,66 @@ export const Account: React.FC = () => {
         ) : null}
       </div>
 
-     {!isLoading? <>
-        {openTransferBatch ? (
-          <TransferModal
-            nfts={nfts.filter((_, i) => selected.includes(i))}
-            title="Transfer NFT"
-            loading={isTransferring}
-            open={openTransferBatch}
-            handleClose={() => setOpenTransferBatch(false)}
-            onSave={handleTransfer}
-          />
-        ) : null}
-        {nft ? (
-          <ListSaleModal
-            title="List NFT for Sale"
-            loading={isListing}
-            open={openListSale}
-            handleClose={() => setOpenListSale(false)}
-            onSave={handleListSale}
-            nft={nft}
-          />
-        ) : null}
-        {selected?.length && openListBatch ? (
-          <ListBatchModal
-            action="list-sale"
-            title="List NFT for Sale"
-            loading={isListing}
-            open={openListBatch}
-            handleClose={() => setOpenListBatch(false)}
-            onSave={handleListBatch}
-            nfts={nfts.filter((_, i) => selected.includes(i))}
-          />
-        ) : null}
-        {nft ? (
-          <ListAuctionModal
-            title="List NFT for Auction"
-            loading={isListing}
-            open={openListAuction}
-            handleClose={() => setOpenListAuction(false)}
-            onSave={handleListAuction}
-            nft={nft}
-          />
-        ) : null}
-      </>:<>
-      <div className="w-full h-[max(70vh,20rem)]  flex items-center justify-center">
-          <GridLoader
-            size={30}
-            color={isDarkTheme ? "#fff" : "#000"}
-            className="sm:!hidden !text-primary "
-          />
-          <GridLoader
-            size={50}
-            color={isDarkTheme ? "#fff" : "#000"}
-            className="!hidden sm:!block !text-primary "
-          />
-        </div></>}
+      {!isLoading ? (
+        <>
+          {openTransferBatch ? (
+            <TransferModal
+              nfts={nfts.filter((_, i) => selected.includes(i))}
+              title="Transfer NFT"
+              loading={isTransferring}
+              open={openTransferBatch}
+              handleClose={() => setOpenTransferBatch(false)}
+              onSave={handleTransfer}
+            />
+          ) : null}
+          {nft ? (
+            <ListSaleModal
+              title="List NFT for Sale"
+              loading={isListing}
+              open={openListSale}
+              handleClose={() => setOpenListSale(false)}
+              onSave={handleListSale}
+              nft={nft}
+            />
+          ) : null}
+          {selected?.length && openListBatch ? (
+            <ListBatchModal
+              action="list-sale"
+              title="List NFT for Sale"
+              loading={isListing}
+              open={openListBatch}
+              handleClose={() => setOpenListBatch(false)}
+              onSave={handleListBatch}
+              nfts={nfts.filter((_, i) => selected.includes(i))}
+            />
+          ) : null}
+          {nft ? (
+            <ListAuctionModal
+              title="List NFT for Auction"
+              loading={isListing}
+              open={openListAuction}
+              handleClose={() => setOpenListAuction(false)}
+              onSave={handleListAuction}
+              nft={nft}
+            />
+          ) : null}
+        </>
+      ) : (
+        <>
+          <div className="w-full h-[max(70vh,20rem)]  flex items-center justify-center">
+            <GridLoader
+              size={30}
+              color={isDarkTheme ? "#fff" : "#000"}
+              className="sm:!hidden !text-primary "
+            />
+            <GridLoader
+              size={50}
+              color={isDarkTheme ? "#fff" : "#000"}
+              className="!hidden sm:!block !text-primary "
+            />
+          </div>
+        </>
+      )}
     </Layout>
-  ) ;
+  );
 };

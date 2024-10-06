@@ -1,8 +1,7 @@
 import * as React from "react";
 import Menu from "@mui/material/Menu";
 import styled from "styled-components";
-import { PROVIDER_ID, useWallet } from "@txnlab/use-wallet";
-import { Box } from "@mui/material";
+import { Box, MenuItem, Select } from "@mui/material";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import { Link } from "react-router-dom";
@@ -12,6 +11,8 @@ import {
   getActions,
   submitAction,
 } from "../../config/quest";
+import { useWallet } from "@txnlab/use-wallet-react";
+import { ArrowDownward } from "@mui/icons-material";
 
 const WalletIcon2 = () => {
   return (
@@ -110,7 +111,7 @@ const WalletContainer = styled.div`
 
 const ProviderContainer = styled.div`
   /* Layout */
-  width: 270px;
+  width: 300px;
   display: flex;
   padding: 16px 8px;
   flex-direction: column;
@@ -196,7 +197,7 @@ const ActiveButton = styled(Button)`
   line-height: 20px; /* 125% */
   text-decoration-line: underline;
   display: flex;
-  width:max-content;
+  width: max-content;
 `;
 
 const WalletIcon = styled.div`
@@ -450,8 +451,11 @@ const OuterConnectButton: React.FC<OuterConnectButtonProps> = ({ theme }) => {
 };
 
 function BasicMenu() {
-  const { activeAccount, providers, connectedAccounts } = useWallet();
-  console.log({providers})
+  /* Theme */
+  const isDarkTheme = useSelector(
+    (state: RootState) => state.theme.isDarkTheme
+  );
+  const { activeAccount, wallets } = useWallet();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -460,28 +464,26 @@ function BasicMenu() {
   const handleClose = () => {
     setAnchorEl(null);
   };
+
   // ---------------------------------------------
   // QUEST
   // ---------------------------------------------
-  React.useEffect(() => {
-    if (activeAccount) {
-      const action = QUEST_ACTION.CONNECT_WALLET;
-      const address = activeAccount.address;
-      const key = `${action}:${address}`;
-      getActions(address).then(({ data: { results } }) => {
-        const action = results.find((el: any) => el.key === key);
-        if (!action) {
-          submitAction(QUEST_ACTION.CONNECT_WALLET, address);
-          // alert here
-        }
-      });
-    }
-  }, [activeAccount]);
+  // React.useEffect(() => {
+  //   if (activeAccount) {
+  //     const action = QUEST_ACTION.CONNECT_WALLET;
+  //     const address = activeAccount.address;
+  //     const key = `${action}:${address}`;
+  //     getActions(address).then(({ data: { results } }) => {
+  //       const action = results.find((el: any) => el.key === key);
+  //       if (!action) {
+  //         submitAction(QUEST_ACTION.CONNECT_WALLET, address);
+  //         // alert here
+  //       }
+  //     });
+  //   }
+  // }, [activeAccount]);
   // ---------------------------------------------
-  /* Theme */
-  const isDarkTheme = useSelector(
-    (state: RootState) => state.theme.isDarkTheme
-  );
+
   return (
     <div>
       {!activeAccount ? (
@@ -510,76 +512,100 @@ function BasicMenu() {
           <AccountDropdownLabel className="light">
             {activeAccount?.address.slice(0, 4)}
           </AccountDropdownLabel>
-          {/*<img
-            style={{
-              transform: open ? "rotate(180deg)" : "rotate(0deg)",
-              transition: "transform 0.3s",
-            }}
-            src={ArrowDownwardIcon}
-          />*/}
           <StyledWalletIcon />
         </AccountDropdown>
       )}
-
       <AccountMenu
-// className="!bg-background !text-primary"
         id="basic-menu"
         anchorEl={anchorEl}
         open={open}
         onClose={handleClose}
         className="overflow-hidden"
-        
         MenuListProps={{
           "aria-labelledby": "basic-button",
-          className:`${isDarkTheme?"dark":""} !bg-secondary !text-primary !rounded-lg !overflow-hidden`,
-          sx: {
-          }
+          className: `${
+            isDarkTheme ? "dark" : ""
+          } !bg-secondary !text-primary !rounded-lg !overflow-hidden`,
         }}
         slotProps={{
-          paper:{
-            className:`${isDarkTheme?"dark":""} !bg-secondary !text-primary!overflow-hidden !rounded-lg `
-          }
+          paper: {
+            className: `${
+              isDarkTheme ? "dark" : ""
+            } !bg-secondary !text-primary!overflow-hidden !rounded-lg `,
+            style: { transform: "translateY(20px)" }, // Moves the menu 10px down
+          },
         }}
-        // PaperProps={{
-        //   elevation: 0,
-        //   sx: {
-        //     display: "inline-flex",
-        //     padding: "18px",
-        //     flexDirection: "column",
-        //     alignItems: "flex-start",
-        //     gap: "24px",
-        //     borderRadius: "16px",
-        //     overflow: "visible",
-        //     filter: "drop-shadow(0px 2px 8px rgba(0,0,0,0.32))",
-        //     mt: 2,
-        //     "& .MuiAvatar-root": {
-        //       width: 32,
-        //       height: 32,
-        //       ml: -0.5,
-        //       mr: 1,
-        //     },
-        //     /*
-        //     "&::before": {
-        //       content: '""',
-        //       display: "block",
-        //       position: "absolute",
-        //       top: 0,
-        //       right: 20,
-        //       width: 20,
-        //       height: 20,
-        //       bgcolor: "background.paper",
-        //       transform: "translateY(-50%) rotate(45deg)",
-        //       zIndex: 0,
-        //     },
-        //     */
-        //   },
-        // }}
-        // transformOrigin={{ horizontal: "right", vertical: "top" }}
-        // anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
       >
-        <WalletContainer
-        className="">
-          {providers?.map((provider) => {
+        <WalletContainer className="">
+          {wallets?.map((wallet) => (
+            <ProviderContainer
+              key={wallet.id}
+              className={`${
+                isDarkTheme ? "dark" : ""
+              } !bg-secondary !text-primary`}
+            >
+              <ProviderIconContainer>
+                <ProviderName>
+                  <WalletIcon
+                    style={{
+                      background: `url(${wallet.metadata.icon}) lightgray 50% / cover no-repeat`,
+                    }}
+                  />
+                  <ProviderNameLabel
+                    className={`${
+                      isDarkTheme ? "dark" : ""
+                    } !bg-secondary !text-primary`}
+                  >
+                    {wallet.metadata.name}
+                  </ProviderNameLabel>
+                  <Wallet />
+                </ProviderName>
+                {wallet.isActive ? (
+                  <Box
+                    onClick={(e: any) => {
+                      wallet.disconnect();
+                      setAnchorEl(null);
+                    }}
+                  >
+                    <DisconnectButton />
+                  </Box>
+                ) : (
+                  <Box
+                    onClick={(e: any) => {
+                      wallet.connect().then(() => {
+                        //setAnchorEl(null);
+                      });
+                    }}
+                  >
+                    <ConnectButton />
+                  </Box>
+                )}
+              </ProviderIconContainer>
+              {wallet.isActive && wallet.accounts.length > 0 ? (
+                <Select
+                  fullWidth
+                  size="small"
+                  className="classic-select"
+                  value={activeAccount?.address}
+                  onChange={(e) => {
+                    wallet.setActiveAccount(e.target.value);
+                  }}
+                  color={"primary"}
+                >
+                  {wallet.accounts.map((account) => {
+                    return (
+                      <MenuItem value={account.address} key={account.address}>
+                        {account.address}
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+              ) : (
+                ""
+              )}
+            </ProviderContainer>
+          ))}
+          {/*providers?.map((provider) => {
             return (
               <ProviderContainer className={`${isDarkTheme?"dark":""} !bg-secondary !text-primary`}>
                 <ProviderIconContainer>
@@ -660,7 +686,7 @@ function BasicMenu() {
                 </ConnectedAccountContainer>
               </ProviderContainer>
             );
-          })}
+          })*/}
         </WalletContainer>
         {/*<MenuItem
           onClick={(e) => {

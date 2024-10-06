@@ -1,4 +1,10 @@
-import React, { ReactNode, Suspense, useEffect, useMemo, useState } from "react";
+import React, {
+  ReactNode,
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import Layout from "../../layouts/Default";
 import {
   Box,
@@ -57,7 +63,13 @@ import {
   useSmartTokens,
 } from "@/components/Navbar/hooks/collections";
 import { GridLoader } from "react-spinners";
-import { Dialog, DialogContent, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { stripTrailingZeroBytes } from "@/utils/string";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -705,8 +717,9 @@ export const Listings: React.FC = () => {
             placeholder="Search"
             value={searchValue}
             onChange={(e) => {
-              if (e.target.value === "") {setSearch("");
-                setSearchValue("")
+              if (e.target.value === "") {
+                setSearch("");
+                setSearchValue("");
               }
               debouncedSearch(e.target.value);
               setSearchValue(e.target.value);
@@ -870,7 +883,6 @@ export const Listings: React.FC = () => {
     </SidebarFilterRoot>
   );
 
-
   const renderHeading = (
     <ListingHeading>
       <HeadingContainer className="my-4 flex items-center">
@@ -890,10 +902,10 @@ export const Listings: React.FC = () => {
     return (
       <Layout>
         <ListingRoot className="!flex !flex-col lg:!flex-row !items-center md:!items-start">
-        <div className="!hidden sm:!block">{renderSidebar}</div>
-        <div className="sm:!hidden w-full"><DialogSearch >
-        {renderSidebar}
-          </DialogSearch></div>
+          <div className="!hidden sm:!block">{renderSidebar}</div>
+          <div className="sm:!hidden w-full">
+            <DialogSearch>{renderSidebar}</DialogSearch>
+          </div>
           <div className="w-full">
             {renderHeading}
             <div className="w-full h-[max(70vh,20rem)]  flex items-center justify-center">
@@ -917,46 +929,24 @@ export const Listings: React.FC = () => {
     <Layout>
       <ListingRoot className="!flex !flex-col lg:!flex-row !items-center md:!items-start">
         <div className="!hidden sm:!block">{renderSidebar}</div>
-        <div className="sm:!hidden w-full"><DialogSearch >
-        {renderSidebar}
-          </DialogSearch></div>
+        <div className="sm:!hidden w-full">
+          <DialogSearch>{renderSidebar}</DialogSearch>
+        </div>
         <ListingContainer>
           {renderHeading}
-
-          {/* <ListingGrid> */}
           <div className=" items-center flex flex-col sm:grid md:grid-cols-2 xl:grid-cols-3 sm:w-fit gap-4 sm:gap-2">
             {filteredListings
               .slice(0, showing)
               .map((el: NFTIndexerListingI) => {
                 const pk = `${el.mpContractId}-${el.mpListingId}`;
-                // const nft = tokens.find(
-                //   (t: TokenI) =>
-                //     t.contractId === el.collectionId && t.tokenId === el.tokenId
-                // );
-                // console.log({ nft, filteredListings, el, tokens });
-                // console.log(nft?.metadataURI);
-                // const collectionsMissingImage = [35720076];
-                // const url = !collectionsMissingImage.includes(nft?.contractId)
-                //   ? `https://prod.cdn.highforge.io/i/${encodeURIComponent(
-                //       nft?.metadataURI
-                //     )}?w=400`
-                //   : nft?.metadata?.image;
-                // const currency = smartTokens.find(
-                //   (st: TokenType) => `${st.contractId}` === `${el.currency}`
-                // );
-                // const currencySymbol =
-                //   currency?.tokenId === "0" ? "VOI" : currency?.symbol || "VOI";
-                // const currencyDecimals =
-                //   currency?.decimals === 0 ? 0 : currency?.decimals || 6;
-                // const price = formatter.format(
-                //   new BigNumber(el.price)
-                //     .div(new BigNumber(10).pow(currencyDecimals))
-                //     .toNumber()
-                // );
+                const listedToken = {
+                  ...el.token,
+                  metadataURI: stripTrailingZeroBytes(el.token.metadataURI),
+                };
                 return (
                   <Grid2 key={pk}>
                     <CartNftCard
-                      token={el.token}
+                      token={listedToken}
                       listing={el}
                       onClick={() => {
                         navigate(
@@ -967,34 +957,39 @@ export const Listings: React.FC = () => {
                   </Grid2>
                 );
               })}
-            <Grid2>
-              <div
-                onClick={() => setShowing(showing + 50)}
-                className={`${
-                  isDarkTheme ? "button-dark" : "button-light"
-                } cursor-pointer`}
-              >
+            {
+              <Grid2>
                 <div
-                  className={
-                    isDarkTheme ? "button-text-dark" : "button-text-light"
-                  }
+                  onClick={() => setShowing(showing + 50)}
+                  className={`${
+                    isDarkTheme ? "button-dark" : "button-light"
+                  } cursor-pointer`}
                 >
-                  View More
+                  <div
+                    className={
+                      isDarkTheme ? "button-text-dark" : "button-text-light"
+                    }
+                  >
+                    View More
+                  </div>
                 </div>
-              </div>
-            </Grid2>
+              </Grid2>
+            }
           </div>
-          {/* </ListingGrid> */}
         </ListingContainer>
       </ListingRoot>
     </Layout>
   );
 };
 
-const DialogSearch = ({children}:{children:ReactNode}) => {
+const DialogSearch = ({ children }: { children: ReactNode }) => {
   return (
-    <Dialog >
-      <DialogTrigger className="w-full"><div className="rounded p-2 border w-full">Search <SearchOutlined /></div></DialogTrigger>
+    <Dialog>
+      <DialogTrigger className="w-full">
+        <div className="rounded p-2 border w-full">
+          Search <SearchOutlined />
+        </div>
+      </DialogTrigger>
       <DialogContent>
         {/* <DialogHeader>
       <DialogTitle>Are you absolutely sure?</DialogTitle>
@@ -1003,10 +998,10 @@ const DialogSearch = ({children}:{children:ReactNode}) => {
         and remove your data from our servers.
       </DialogDescription>
     </DialogHeader> */}
-    {/* <DialogDescription> */}
- 
+        {/* <DialogDescription> */}
+
         <div className="flex items-center mx-auto">{children}</div>
-      {/* </DialogDescription> */}
+        {/* </DialogDescription> */}
       </DialogContent>
     </Dialog>
   );

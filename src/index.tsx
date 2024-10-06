@@ -2,10 +2,10 @@ import React from "react";
 import App from "./App";
 import { createRoot } from 'react-dom/client';
 import "./style.css";
+import { Buffer } from 'buffer';
 
-// ? Migrated to create root instead since ReactDOM.render is deprecated
+window.Buffer = Buffer;
+
 const container=document.getElementById("root");
 const root = createRoot(container!);
 root.render(<App/>)
-
-// ReactDOM.render(<App />, );

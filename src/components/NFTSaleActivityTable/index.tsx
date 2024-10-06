@@ -32,6 +32,7 @@ import CryptoIconPlaceholder from "../CryptoIconPlaceholder";
 import { intToColorCode } from "../../utils/string";
 import { getToken } from "../../store/tokenSlice";
 import axios from "axios";
+import { HIGHFORGE_CDN } from "@/config/arc72-idx";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -246,7 +247,7 @@ const NFTCollectionTable: React.FC<Props> = ({
               ) || ({} as CollectionI);
             const collectionsMissingImage = [35720076];
             const url = !collectionsMissingImage.includes(sale.collectionId)
-              ? `https://prod.cdn.highforge.io/i/${encodeURIComponent(
+              ? `${HIGHFORGE_CDN}/i/${encodeURIComponent(
                   token.metadataURI
                 )}?w=240`
               : token.metadata.image;

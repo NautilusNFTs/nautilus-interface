@@ -4,6 +4,7 @@ import axios from "axios";
 import db from "../db";
 import { RootState } from "./store";
 import { TokenType } from "../types";
+import { ARC72_INDEXER_API } from "@/config/arc72-idx";
 
 export interface SmartTokensState {
   tokens: TokenType[];
@@ -22,7 +23,7 @@ export const getSmartTokens = createAsyncThunk<
       return storedTokens;
     }
     const response = await axios.get(
-      `https://arc72-idx.nautilus.sh/nft-indexer/v1/arc200/tokens?includes=all`
+      `${ARC72_INDEXER_API}/nft-indexer/v1/arc200/tokens?includes=all`
     );
     const tokens = response.data.tokens;
     await db.table("smartTokens").bulkPut(

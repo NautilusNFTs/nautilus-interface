@@ -20,3 +20,12 @@ export function intToColorCode(n: number): string {
 
   return `#${hexColor}`;
 }
+
+export const stripTrailingZeroBytes = (str: string) => {
+  const index = str.indexOf("\x00");
+  if (index > 0) {
+    return str.slice(0, str.indexOf("\x00"));
+  } else {
+    return str;
+  }
+};

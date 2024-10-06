@@ -23,6 +23,7 @@ import { getSmartTokens } from "../../store/smartTokenSlice";
 import Grid2 from "@mui/material/Unstable_Grid2"; // Grid version 2
 import LazyLoad from "react-lazy-load";
 import axios from "axios";
+import { stripTrailingZeroBytes } from "@/utils/string";
 
 const ActivityFilterContainer = styled.div`
   display: flex;
@@ -94,9 +95,8 @@ const SectionTitle = styled.h2`
   font-weight: 700;
   line-height: 100%; /* 40px */
   @media (min-width: 620px) {
-  font-size: 40px;
-    
-  } 
+    font-size: 40px;
+  }
 `;
 
 const SectionButtonContainer = styled(Box)`
@@ -301,12 +301,18 @@ export const Home: React.FC = () => {
           </SectionHeading>
           {listings ? (
             <>
-              <div className=" items-center flex flex-col sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:w-fit gap-4 sm:gap-2">
+              <div className=" items-center flex flex-col sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 x sm:w-fit gap-4 sm:gap-2">
                 {listings.slice(0, showing).map((el: NFTIndexerListingI) => {
+                  const nft = {
+                    ...el.token,
+                    metadataURI: stripTrailingZeroBytes(
+                      el?.token?.metadataURI || ""
+                    ),
+                  };
                   return (
                     <Grid2 key={el.transactionId}>
                       <CartNftCard
-                        token={el.token}
+                        token={nft}
                         listing={el}
                         onClick={() => {
                           navigate(

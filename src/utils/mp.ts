@@ -1,3 +1,4 @@
+import { HIGHFORGE_CDN } from "@/config/arc72-idx";
 import { CollectionI, RankingI, Token, TokenType } from "../types";
 import { BigNumber } from "bignumber.js";
 
@@ -209,9 +210,7 @@ export const getRankings = (
     const volume = kv[1];
     const collectionsMissingImage = [35720076];
     const url = !collectionsMissingImage.includes(token.contractId)
-      ? `https://prod.cdn.highforge.io/i/${encodeURIComponent(
-          token.metadataURI
-        )}?w=240`
+      ? `${HIGHFORGE_CDN}/i/${encodeURIComponent(token.metadataURI)}?w=240`
       : token.metadata.image;
     return {
       collectionId: kv[0],

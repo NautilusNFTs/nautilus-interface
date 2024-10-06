@@ -1,28 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Layout from "../../layouts/Default";
-import {
-  Avatar,
-  Button,
-  Grid,
-  Skeleton,
-  Stack,
-} from "@mui/material";
+import { Avatar, Button, Grid, Skeleton, Stack } from "@mui/material";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import axios from "axios";
 import styled from "styled-components";
-import IconAlarm from"/src/static/icon-alarm.svg";
-import ButtonBuy from"/src/static/button-buy.svg";
-import ButtonOffer from"/src/static/button-offer.svg";
-import ButtonBid from"/src/static/button-bid.svg";
+import IconAlarm from "/src/static/icon-alarm.svg";
+import ButtonBuy from "/src/static/button-buy.svg";
+import ButtonOffer from "/src/static/button-offer.svg";
+import ButtonBid from "/src/static/button-bid.svg";
 import { stringToColorCode } from "../../utils/string";
 import RowingIcon from "@mui/icons-material/Rowing";
 
 import { useCopyToClipboard } from "usehooks-ts";
 import { toast } from "react-toastify";
-
-import { useWallet } from "@txnlab/use-wallet";
 
 import algosdk from "algosdk";
 //import { MarketplaceContext } from "../../store/MarketplaceContext";
@@ -32,14 +24,14 @@ import BuySaleModal from "../../components/modals/BuySaleModal";
 // @ts-ignore
 import { CONTRACT, arc72, arc200, mp, abi, swap } from "ulujs";
 import { getAlgorandClients } from "../../wallets";
-import { ListingBoxCost, ctcInfoMp206 } from "../../contants/mp";
+import { ListingBoxCost, CTCINFO_MP206 } from "../../contants/mp";
 
-import VoiIcon from"/src/static/crypto-icons/voi/0.svg";
-import ViaIcon from"/src/static/crypto-icons/voi/6779767.svg";
+import VoiIcon from "/src/static/crypto-icons/voi/0.svg";
+import ViaIcon from "/src/static/crypto-icons/voi/6779767.svg";
 
-import XIcon from"/src/static/icon/icon-x.svg";
-import DiscordIcon from"/src/static/icon/icon-discord.svg";
-import LinkIcon from"/src/static/icon/icon-link.svg";
+import XIcon from "/src/static/icon/icon-x.svg";
+import DiscordIcon from "/src/static/icon/icon-discord.svg";
+import LinkIcon from "/src/static/icon/icon-link.svg";
 import NFTTabs from "../../components/NFTTabs";
 import ListSaleModal from "../modals/ListSaleModal";
 import { QUEST_ACTION, getActions, submitAction } from "../../config/quest";
@@ -48,6 +40,9 @@ import { UnknownAction } from "@reduxjs/toolkit";
 import { NFTIndexerListingI, TokenType } from "../../types";
 import { BigNumber } from "bignumber.js";
 import { decodeRoyalties } from "../../utils/hf";
+import { useWallet } from "@txnlab/use-wallet-react";
+import { TOKEN_WVOI } from "@/contants/tokens";
+import { useAccountInfo } from "../Navbar/hooks";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -273,7 +268,7 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
   exchangeRate,
 }) => {
   /* Wallet */
-  const { activeAccount, signTransactions, sendTransactions } = useWallet();
+  const { activeAccount, signTransactions } = useWallet();
   /* Modal */
   const [openBuyModal, setOpenBuyModal] = React.useState(false);
   const [isBuying, setIsBuying] = React.useState(false);
@@ -310,7 +305,7 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
   const handleDeleteListing = async (listingId: number) => {
     try {
       const ci = new CONTRACT(
-        ctcInfoMp206,
+        CTCINFO_MP206,
         algodClient,
         indexerClient,
         {
@@ -343,9 +338,10 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
         throw new Error("a_sale_deleteListing failed in simulate");
       }
       const txns = a_sale_deleteListingR.txns;
-      await signTransactions(
+      const stxns = await signTransactions(
         txns.map((txn: string) => new Uint8Array(Buffer.from(txn, "base64")))
-      ).then(sendTransactions);
+      );
+      await algodClient.sendRawTransaction(stxns as Uint8Array[]).do();
       toast.success("Unlist successful!");
     } catch (e: any) {
       console.log(e);
@@ -414,7 +410,7 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
           true
         ),
         mp: new CONTRACT(
-          ctcInfoMp206,
+          CTCINFO_MP206,
           algodClient,
           indexerClient,
           {
@@ -557,7 +553,7 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
       };
       const ciArc200 = new arc200(currencyN, algodClient, indexerClient);
       const ci = new CONTRACT(
-        ctcInfoMp206,
+        CTCINFO_MP206,
         algodClient,
         indexerClient,
         {
@@ -600,7 +596,7 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
               "G3MSA75OZEJTCCENOJDLDJK7UD7E2K5DNC7FVHCNOV7E3I4DTXTOWDUIFQ" // CreatePoints1
           ),
           builder.arc72.arc72_approve(
-            algosdk.getApplicationAddress(ctcInfoMp206), // Address
+            algosdk.getApplicationAddress(CTCINFO_MP206), // Address
             tokenId // TokenId
           ),
         ];
@@ -641,34 +637,35 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
           customR.txns.map(
             (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
           )
-        ).then(sendTransactions);
+        );
+        //.then(sendTransactions);
         // ---------------------------------------
         // QUEST HERE list voi
         // ---------------------------------------
-        do {
-          const address = activeAccount.address;
-          const actions: string[] = [
-            QUEST_ACTION.SALE_LIST_ONCE,
-            QUEST_ACTION.TIMED_SALE_LIST_1MINUTE,
-            QUEST_ACTION.TIMED_SALE_LIST_15MINUTES,
-            QUEST_ACTION.TIMED_SALE_LIST_1HOUR,
-          ];
-          const {
-            data: { results },
-          } = await getActions(address);
-          for (const action of actions) {
-            const address = activeAccount.address;
-            const key = `${action}:${address}`;
-            const completedAction = results.find((el: any) => el.key === key);
-            if (!completedAction) {
-              await submitAction(action, address, {
-                contractId,
-                tokenId,
-              });
-            }
-            // TODO notify quest completion here
-          }
-        } while (0);
+        // do {
+        //   const address = activeAccount.address;
+        //   const actions: string[] = [
+        //     QUEST_ACTION.SALE_LIST_ONCE,
+        //     QUEST_ACTION.TIMED_SALE_LIST_1MINUTE,
+        //     QUEST_ACTION.TIMED_SALE_LIST_15MINUTES,
+        //     QUEST_ACTION.TIMED_SALE_LIST_1HOUR,
+        //   ];
+        //   const {
+        //     data: { results },
+        //   } = await getActions(address);
+        //   for (const action of actions) {
+        //     const address = activeAccount.address;
+        //     const key = `${action}:${address}`;
+        //     const completedAction = results.find((el: any) => el.key === key);
+        //     if (!completedAction) {
+        //       await submitAction(action, address, {
+        //         contractId,
+        //         tokenId,
+        //       });
+        //     }
+        //     // TODO notify quest completion here
+        //   }
+        // } while (0);
         // ---------------------------------------
       }
       // VIA Sale
@@ -678,7 +675,7 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
         // ------------------------------------------d
         do {
           const ciMp = new CONTRACT(
-            ctcInfoMp206,
+            CTCINFO_MP206,
             algodClient,
             indexerClient,
             {
@@ -775,7 +772,8 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
                 customR.txns.map(
                   (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
                 )
-              ).then(sendTransactions),
+              ),
+              //.then(sendTransactions),
               {
                 pending: `Transaction signature pending setup recipient account (${
                   i + 1
@@ -808,7 +806,7 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
               "G3MSA75OZEJTCCENOJDLDJK7UD7E2K5DNC7FVHCNOV7E3I4DTXTOWDUIFQ" // CreatePoints1
           ),
           builder.arc72.arc72_approve(
-            algosdk.getApplicationAddress(ctcInfoMp206),
+            algosdk.getApplicationAddress(CTCINFO_MP206),
             tokenId
           ),
         ];
@@ -850,7 +848,8 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
             customR.txns.map(
               (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
             )
-          ).then(sendTransactions),
+          ),
+          //.then(sendTransactions),
           {
             pending: `Transaction signature pending... ${((str) =>
               str[0].toUpperCase() + str.slice(1))(
@@ -861,7 +860,7 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
           }
         );
         // ---------------------------------------
-        // QUEST HERE list via
+        // // QUEST HERE list via
         // ---------------------------------------
       }
     } catch (e: any) {
@@ -878,7 +877,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
     extraTxns = []
   ) => {
     try {
-      const CTC_INFO_WVOI = 34099056; // wVOI2
       const zeroAddress =
         "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ";
       const manager =
@@ -919,7 +917,7 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
 
       const makePTok = () =>
         new CONTRACT(
-          listing.currency === 0 ? CTC_INFO_WVOI : listing.currency,
+          listing.currency === 0 ? TOKEN_WVOI : listing.currency,
           algodClient,
           indexerClient,
           abi.nt200,
@@ -946,7 +944,7 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
 
       const ci = makeCI(mpContractId, abi.custom);
 
-      const ciWVOI = makeCI(CTC_INFO_WVOI, abi.nt200);
+      const ciWVOI = makeCI(TOKEN_WVOI, abi.nt200);
 
       const wVOIBalanceR = await ciWVOI.arc200_balanceOf(addr);
       if (!wVOIBalanceR.success)
@@ -959,9 +957,9 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
       console.log({ wVOIBalance, wVOIBalanceNum });
 
       const builder = {
-        tokV: makeConstructor(CTC_INFO_WVOI, abi.nt200),
+        tokV: makeConstructor(TOKEN_WVOI, abi.nt200),
         tokP: makeConstructor(
-          listing.currency === 0 ? CTC_INFO_WVOI : listing.currency,
+          listing.currency === 0 ? TOKEN_WVOI : listing.currency,
           abi.arc200
         ),
         nft: makeConstructor(nftContractId, abi.arc72),
@@ -992,8 +990,8 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
                 (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
               )
             )
-            .then(signTransactions)
-            .then(sendTransactions),
+            .then(signTransactions),
+          //.then(sendTransactions),
           {
             pending: `Transaction pending...`,
           }
@@ -1023,8 +1021,8 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
                 (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
               )
             )
-            .then(signTransactions)
-            .then(sendTransactions),
+            .then(signTransactions),
+          //.then(sendTransactions),
           {
             pending: `Transaction pending...`,
           }
@@ -1053,8 +1051,8 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
                 (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
               )
             )
-            .then(signTransactions)
-            .then(sendTransactions),
+            .then(signTransactions),
+          //.then(sendTransactions),
           {
             pending: `Transaction pending...`,
           }
@@ -1284,7 +1282,8 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
         res.txns.map(
           (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
         )
-      ).then(sendTransactions),
+      ),
+      //.then(sendTransactions),
       {
         pending: "Transaction pending...",
         success: "Listing deleted!",
@@ -1292,6 +1291,13 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
       }
     );
   }, [activeAccount, manager, nft.listing]);
+
+  // EFFECT: get voi account info
+  const {
+    data: accInfo,
+    isLoading: isBalanceLoading,
+    refetch: refetchBalance,
+  } = useAccountInfo();
 
   // handleBuy
   const handleBuyClick = async (pool: any, discount: any) => {
@@ -1371,36 +1377,38 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
       console.log({ customR });
       if (!customR.success) throw new Error("custed failed at end"); // abort
       // -------------------------------------
-      // SIGM HERE
+      // SIGN HERE
       // -------------------------------------
-      await signTransactions(
+      const stxns = await signTransactions(
         customR.txns.map(
           (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
         )
-      ).then(sendTransactions);
+      );
+      await algodClient.sendRawTransaction(stxns as Uint8Array[]).do();
+      // TODO update balance
       // -------------------------------------
       // QUEST HERE buy
       // -------------------------------------
-      do {
-        const address = activeAccount.address;
-        const actions: string[] = [QUEST_ACTION.SALE_BUY_ONCE];
-        const {
-          data: { results },
-        } = await getActions(address);
-        for (const action of actions) {
-          const address = activeAccount.address;
-          const key = `${action}:${address}`;
-          const completedAction = results.find((el: any) => el.key === key);
-          if (!completedAction) {
-            const { collectionId: contractId, tokenId } = nft.listing;
-            await submitAction(action, address, {
-              contractId,
-              tokenId,
-            });
-          }
-          // TODO notify quest completion here
-        }
-      } while (0);
+      // do {
+      //   const address = activeAccount.address;
+      //   const actions: string[] = [QUEST_ACTION.SALE_BUY_ONCE];
+      //   const {
+      //     data: { results },
+      //   } = await getActions(address);
+      //   for (const action of actions) {
+      //     const address = activeAccount.address;
+      //     const key = `${action}:${address}`;
+      //     const completedAction = results.find((el: any) => el.key === key);
+      //     if (!completedAction) {
+      //       const { collectionId: contractId, tokenId } = nft.listing;
+      //       await submitAction(action, address, {
+      //         contractId,
+      //         tokenId,
+      //       });
+      //     }
+      //     // TODO notify quest completion here
+      //   }
+      // } while (0);
       // -------------------------------------
       toast.success("Purchase successful!");
     } catch (e: any) {

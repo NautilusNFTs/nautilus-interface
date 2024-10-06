@@ -1,5 +1,5 @@
 import styled from "@emotion/styled";
-import React, { useEffect } from "react";
+import React, { useCallback, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import LightLogo from "/src/static/logo-light.svg";
 import DarkLogo from "/src/static/logo-dark.svg";
@@ -10,8 +10,7 @@ import ThemeSelector from "../ThemeSelector";
 // import Box from "@mui/material/Box";
 // import Popper from "@mui/material/Popper";
 // import Fade from "@mui/material/Fade";
-import { useWallet } from "@txnlab/use-wallet";
-import { Chip, Divider, Stack } from "@mui/material";
+import { Button, Chip, Divider, Stack, Tooltip } from "@mui/material";
 
 import { useCopyToClipboard } from "usehooks-ts";
 import { toast } from "react-toastify";
@@ -38,6 +37,10 @@ import {
 } from "./components.styled";
 import { useAccountInfo } from "./hooks";
 import { linkLabels, navlinks } from "./constants";
+import { useWallet } from "@txnlab/use-wallet-react";
+import { getAlgorandClients } from "@/wallets";
+import { abi, arc200, CONTRACT } from "ulujs";
+import { TOKEN_WVOI } from "@/contants/tokens";
 
 const AccountIcon = () => {
   return (
@@ -59,7 +62,6 @@ const AccountIcon = () => {
   );
 };
 
-
 const Navbar = () => {
   const location = useLocation();
 
@@ -80,27 +82,31 @@ const Navbar = () => {
 
   /* Wallet */
 
-  const { activeAccount, providers } = useWallet();
-
-  // const [accInfo, setAccInfo] = React.useState<any>(null);
-  const [balance, setBalance] = React.useState<any>(null);
+  const { activeAccount, signTransactions } = useWallet();
 
   // EFFECT: get voi account info
-  const { data: accInfo, isLoading: isBalanceLoading } = useAccountInfo();
-  // EFFECT: get via balance
-  // useEffect(() => {
-  //   if (activeAccount && providers && providers.length >= 3) {
-  //     const { algodClient, indexerClient } = getAlgorandClients();
-  //     const ci = new arc200(TOKEN_VIA, algodClient, indexerClient);
-  //     ci.arc200_balanceOf(activeAccount.address).then(
-  //       (arc200_balanceOfR: any) => {
-  //         if (arc200_balanceOfR.success) {
-  //           setBalance(Number(arc200_balanceOfR.returnValue));
-  //         }
-  //       }
-  //     );
-  //   }
-  // }, [activeAccount, providers]);
+  const {
+    data: accInfo,
+    isLoading: isBalanceLoading,
+    refetch: refetchBalance,
+  } = useAccountInfo();
+
+  // EFFECT: get wVOI balance
+  const [balance, setBalance] = React.useState<any>(null);
+  const fetchBalance = useCallback(async () => {
+    if (!activeAccount) return BigInt(0);
+    const { algodClient, indexerClient } = getAlgorandClients();
+    const ci = new arc200(TOKEN_WVOI, algodClient, indexerClient);
+    const arc200_balanceOfR = await ci.arc200_balanceOf(activeAccount.address);
+    if (arc200_balanceOfR.success) {
+      setBalance(Number(arc200_balanceOfR.returnValue));
+    }
+  }, [activeAccount]);
+  useEffect(() => {
+    fetchBalance();
+  }, [activeAccount]);
+
+  console.log("balance", balance);
 
   /* Theme */
 
@@ -267,7 +273,7 @@ const Navbar = () => {
                   >
                     <Stack
                       direction="row"
-                      spacing={0.5}
+                      spacing={2}
                       sx={{
                         alignItems: "center",
                         justifyContent: "space-between",
@@ -281,6 +287,52 @@ const Navbar = () => {
                         ).toLocaleString()}{" "}
                         VOI
                       </div>
+                      <Tooltip title="Click to withdraw VOI">
+                        <Button
+                          size="small"
+                          variant="contained"
+                          sx={{ borderRadius: "25px" }}
+                          onClick={async (ev) => {
+                            ev.preventDefault();
+                            if (balance === 0) {
+                              toast.info("No VOI to withdraw");
+                              return;
+                            }
+
+                            const ci = new CONTRACT(
+                              TOKEN_WVOI,
+                              getAlgorandClients().algodClient,
+                              getAlgorandClients().indexerClient,
+                              abi.nt200,
+                              {
+                                addr: activeAccount.address,
+                                sk: new Uint8Array(0),
+                              }
+                            );
+                            ci.setFee(2000);
+                            const withdrawR = await ci.withdraw(balance);
+                            if (!withdrawR.success) return;
+                            const stxns = await signTransactions(
+                              withdrawR.txns.map((t: string) => {
+                                return new Uint8Array(Buffer.from(t, "base64"));
+                              })
+                            );
+                            const res = await getAlgorandClients()
+                              .algodClient.sendRawTransaction(
+                                stxns as Uint8Array[]
+                              )
+                              .do();
+                            console.log("withdraw", res);
+                            setBalance(0);
+                            setTimeout(() => {
+                              refetchBalance();
+                            }, 4000);
+                          }}
+                        >
+                          <img src={VIAIcon} style={{ height: "12px" }} />
+                          {(balance / 1e6).toLocaleString()} VOI
+                        </Button>
+                      </Tooltip>
                     </Stack>
                     {/*<Stack
                       direction="row"

@@ -14,18 +14,19 @@ import {
 import { useNavigate } from "react-router-dom";
 import BuySaleModal, { multiplier } from "../modals/BuySaleModal";
 import { toast } from "react-toastify";
-import { useWallet } from "@txnlab/use-wallet";
 import algosdk from "algosdk";
 import { getAlgorandClients } from "../../wallets";
-import { CONTRACT, abi, mp,   swap } from "ulujs";
+import { CONTRACT, abi, mp, swap } from "ulujs";
 import { BigNumber } from "bignumber.js";
 import { QUEST_ACTION, getActions, submitAction } from "../../config/quest";
 import CurrencyExchangeIcon from "@mui/icons-material/CurrencyExchange";
 import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
 import { uluClient } from "../../utils/contract";
 import { zeroAddress } from "../../contants/accounts";
-import { TOKEN_WVOI2 } from "../../contants/tokens";
+import { TOKEN_WVOI } from "../../contants/tokens";
 import { useSelector } from "react-redux";
+import { useWallet } from "@txnlab/use-wallet-react";
+import { HIGHFORGE_CDN } from "@/config/arc72-idx";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -261,7 +262,7 @@ const CartNftCard: React.FC<NFTCardProps> = ({
   onClick,
   selected,
 }) => {
-  const { activeAccount, signTransactions, sendTransactions } = useWallet();
+  const { activeAccount, signTransactions } = useWallet();
 
   const metadata = JSON.parse(token.metadata || "{}");
 
@@ -401,6 +402,7 @@ const CartNftCard: React.FC<NFTCardProps> = ({
       const { algodClient, indexerClient } = getAlgorandClients();
       let customR;
       for (const skipEnsure of [true, false]) {
+        console.log({ pool });
         if (pool) {
           const {
             contractId: poolId,
@@ -443,7 +445,7 @@ const CartNftCard: React.FC<NFTCardProps> = ({
               contractId: outToken?.contractId,
               symbol: outToken?.symbol,
               decimals: `${outToken?.decimals}`,
-            },
+            }
           );
           if (!swapR.success) throw new Error("swap failed");
           const returnValue = swapR.response.txnGroups[0].txnResults
@@ -455,24 +457,30 @@ const CartNftCard: React.FC<NFTCardProps> = ({
 
           customR = await mp.buy(activeAccount.address, listing, currency, {
             paymentTokenId:
-              listing.currency === 0 ? TOKEN_WVOI2 : listing.currency,
-            wrappedNetworkTokenId: TOKEN_WVOI2,
+              listing.currency === 0 ? TOKEN_WVOI : listing.currency,
+            wrappedNetworkTokenId: TOKEN_WVOI,
             extraTxns: swapR.objs,
             algodClient,
             indexerClient,
             skipEnsure,
           });
         } else {
-          customR = await mp.buy(activeAccount.address, listing, currency, {
+          // no pool
+          const paymentToken = smartTokens.find(
+            (el: any) => `${el.contractId}` === `${listing.currency}`
+          );
+          console.log({ paymentToken });
+          customR = await mp.buy(activeAccount.address, listing, paymentToken, {
             paymentTokenId:
-              listing.currency === 0 ? TOKEN_WVOI2 : listing.currency,
-            wrappedNetworkTokenId: TOKEN_WVOI2,
+              listing.currency === 0 ? TOKEN_WVOI : listing.currency,
+            wrappedNetworkTokenId: TOKEN_WVOI,
             extraTxns: [],
             algodClient,
             indexerClient,
             skipEnsure,
           });
         }
+        console.log({ customR });
 
         if (customR.success) break;
       }
@@ -480,34 +488,35 @@ const CartNftCard: React.FC<NFTCardProps> = ({
       // -------------------------------------
       // SIGM HERE
       // -------------------------------------
-      await signTransactions(
+      const stxn = await signTransactions(
         customR.txns.map(
           (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
         )
-      ).then(sendTransactions);
+      );
+      await algodClient.sendRawTransaction(stxn as Uint8Array[]).do();
       // -------------------------------------
       // QUEST HERE buy
       // -------------------------------------
-      do {
-        const address = activeAccount.address;
-        const actions: string[] = [QUEST_ACTION.SALE_BUY_ONCE];
-        const {
-          data: { results },
-        } = await getActions(address);
-        for (const action of actions) {
-          const address = activeAccount.address;
-          const key = `${action}:${address}`;
-          const completedAction = results.find((el: any) => el.key === key);
-          if (!completedAction) {
-            const { collectionId: contractId, tokenId } = listing;
-            await submitAction(action, address, {
-              contractId,
-              tokenId,
-            });
-          }
-          // TODO notify quest completion here
-        }
-      } while (0);
+      // do {
+      //   const address = activeAccount.address;
+      //   const actions: string[] = [QUEST_ACTION.SALE_BUY_ONCE];
+      //   const {
+      //     data: { results },
+      //   } = await getActions(address);
+      //   for (const action of actions) {
+      //     const address = activeAccount.address;
+      //     const key = `${action}:${address}`;
+      //     const completedAction = results.find((el: any) => el.key === key);
+      //     if (!completedAction) {
+      //       const { collectionId: contractId, tokenId } = listing;
+      //       await submitAction(action, address, {
+      //         contractId,
+      //         tokenId,
+      //       });
+      //     }
+      //     // TODO notify quest completion here
+      //   }
+      // } while (0);
       // -------------------------------------
       toast.success("Purchase successful!");
     } catch (e: any) {
@@ -520,9 +529,7 @@ const CartNftCard: React.FC<NFTCardProps> = ({
   };
   const collectionsMissingImage = [35720076];
   const url = !collectionsMissingImage.includes(Number(token.contractId))
-    ? `https://prod.cdn.highforge.io/i/${encodeURIComponent(
-        token.metadataURI
-      )}?w=400`
+    ? `${HIGHFORGE_CDN}/i/${encodeURIComponent(token.metadataURI)}?w=400`
     : metadata.image;
   return display ? (
     <Box

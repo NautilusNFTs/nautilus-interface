@@ -8,7 +8,6 @@ import axios from "axios";
 import styled from "styled-components";
 import { useCopyToClipboard } from "usehooks-ts";
 import { toast } from "react-toastify";
-import { useWallet } from "@txnlab/use-wallet";
 import { CONTRACT, arc72 } from "ulujs";
 import { getAlgorandClients } from "../../wallets";
 import NFTTabs from "../../components/NFTTabs";
@@ -25,7 +24,8 @@ import { getSmartTokens } from "../../store/smartTokenSlice";
 import { TokenType } from "../../types";
 import { BigNumber } from "bignumber.js";
 import CartNftCard from "../../components/CartNFTCard";
-import { ARC72_INDEXER_API } from "../../config/arc72-idx";
+import { ARC72_INDEXER_API, HIGHFORGE_API } from "../../config/arc72-idx";
+import { useWallet } from "@txnlab/use-wallet-react";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -429,7 +429,7 @@ export const Token: React.FC = () => {
   useEffect(() => {
     try {
       axios
-        .get(`https://test-voi.api.highforge.io/projects/info/${id}`)
+        .get(`${HIGHFORGE_API}/projects/info/${id}`)
         .then((res: any) => res.data)
         .then(setCollectionInfo);
     } catch (e) {
@@ -454,8 +454,7 @@ export const Token: React.FC = () => {
           tokens: [nftData],
         },
       } = await axios.get(
-        //`https://arc72-idx.nautilus.sh/nft-indexer/v1/tokens?contractId=${id}&tokenId=${tid}`
-        `https://arc72-idx.nftnavigator.xyz/nft-indexer/v1/tokens?contractId=${id}&tokenId=${tid}`
+        `${ARC72_INDEXER_API}/nft-indexer/v1/tokens?contractId=${id}&tokenId=${tid}`
       );
       // TODO handle missing data
 
@@ -550,10 +549,11 @@ export const Token: React.FC = () => {
   console.log({ nft });
 
   /* NFT Navigator Listings */
+
   const [listings2, setListings] = React.useState<any>([]);
   React.useEffect(() => {
     try {
-      const res = axios
+      axios
         .get(`${ARC72_INDEXER_API}/nft-indexer/v1/mp/listings`, {
           params: {
             active: true,
@@ -595,10 +595,10 @@ export const Token: React.FC = () => {
     return listedNfts;
   }, [collection, listings]);
 
-  const moreNfts = useMemo(() => {
-    if (!nft) return [];
-    return listedNfts?.filter((el: any) => el.tokenId !== nft.tokenId);
-  }, [nft, listedNfts]);
+  // const moreNfts = useMemo(() => {
+  //   if (!nft) return [];
+  //   return listedNfts?.filter((el: any) => el.tokenId !== nft.tokenId);
+  // }, [nft, listedNfts]);
 
   const isLoading = React.useMemo(
     () =>
@@ -633,7 +633,7 @@ export const Token: React.FC = () => {
               nft={nft}
               loading={isLoading}
             />
-            <HeadingContainer>
+            {/*<HeadingContainer>
               <HeadingText
                 className={isDarkTheme ? "dark" : "light"}
               >{`More from ${
@@ -645,8 +645,9 @@ export const Token: React.FC = () => {
                   <ButtonLabel>View Collection</ButtonLabel>
                 </SecondaryButton>
               </StyledLink>
-            </HeadingContainer>
+            </HeadingContainer>*/}
             <NFTCards ref={listingsRef}>
+              {/*
               <div
                 style={{
                   position: "absolute",
@@ -732,7 +733,8 @@ export const Token: React.FC = () => {
                   </svg>
                 </div>
               </div>
-              {listings2.reverse().map((el: any) => {
+              */}
+              {/*listings2.reverse().map((el: any) => {
                 return (
                   <CartNftCard
                     token={el.token}
@@ -745,11 +747,11 @@ export const Token: React.FC = () => {
                     }}
                   />
                 );
-              })}
+              })*/}
               {/*moreNfts.map((el: any) => {
                 const collectionsMissingImage = [35720076];
                 const url = !collectionsMissingImage.includes(el.contractId)
-                  ? `https://prod.cdn.highforge.io/i/${encodeURIComponent(
+                  ? `${HIGHFORGE_CDN}/i/${encodeURIComponent(
                       el.metadataURI
                     )}?w=400`
                   : el.metadata.image;

@@ -1,17 +1,16 @@
+import { getAlgorandClients } from "@/wallets";
 import { useQuery } from "@tanstack/react-query";
-import { useWallet } from "@txnlab/use-wallet";
+import { useWallet } from "@txnlab/use-wallet-react";
 
 export const useAccountInfo = () => {
-    const { providers, activeAccount,  getAccountInfo } =
-  useWallet();
+  const { activeAccount } = useWallet();
+  const { algodClient } = getAlgorandClients();
   const data = useQuery({
     queryFn: () => {
-      if (activeAccount && providers && providers.length >= 3) {
-        return getAccountInfo();
-      }
-      return null;
+      if (!activeAccount) return null;
+      return algodClient.accountInformation(activeAccount?.address).do();
     },
-    queryKey: ["accountInfo", activeAccount?.address, providers?.length],
+    queryKey: ["accountInfo", activeAccount?.address],
   });
   return data;
 };

@@ -27,6 +27,7 @@ import UpIcon from "../../static/icon/icon-up.svg";
 import DownIcon from "../../static/icon/icon-down.svg";
 import InfoIcon from "@mui/icons-material/Info";
 import VoiIcon from "../../static/crypto-icons/voi/0.svg";
+import { HIGHFORGE_CDN } from "@/config/arc72-idx";
 
 const StyledImage = styled(Box)`
   width: 53px;
@@ -315,7 +316,7 @@ const NFTListingTable: React.FC<Props> = ({
                     >
                       <StyledImage
                         sx={{
-                          backgroundImage: `url(https://prod.cdn.highforge.io/i/${token.metadataURI}?w=240)`,
+                          backgroundImage: `url(${HIGHFORGE_CDN}/i/${token.metadataURI}?w=240)`,
                         }}
                       />
                     </Link>
