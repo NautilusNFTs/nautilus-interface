@@ -258,7 +258,9 @@ const BuySaleModal: React.FC<BuySaleModalProps> = ({
         signTransactions(
           res.txns.map((t: string) => new Uint8Array(Buffer.from(t, "base64")))
         )
-          //.then(sendTransactions)
+          .then((stxns: any) =>
+            algodClient.sendRawTransaction(stxns as Uint8Array[]).do()
+          )
           .then(() => handleClose()),
         {
           pending: "Transaction pending...",
