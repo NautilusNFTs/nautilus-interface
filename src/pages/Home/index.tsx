@@ -172,7 +172,7 @@ const SectionBanners = styled.div`
   margin-top: 45px;
 `;
 
-const pageSize = 8;
+const pageSize = 12;
 
 export const Home: React.FC = () => {
   /* Collection Info */
