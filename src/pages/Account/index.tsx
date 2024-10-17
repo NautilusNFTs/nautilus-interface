@@ -33,7 +33,11 @@ import TransferModal from "../../components/modals/TransferModal";
 import ListSaleModal from "../../components/modals/ListSaleModal";
 import ListAuctionModal from "../../components/modals/ListAuctionModal";
 import algosdk from "algosdk";
-import { ListingBoxCost, CTCINFO_MP206 } from "../../contants/mp";
+import {
+  ListingBoxCost,
+  CTCINFO_MP206,
+  CTCINFO_MP206_2,
+} from "../../contants/mp";
 import { decodeRoyalties } from "../../utils/hf";
 import NFTListingTable from "../../components/NFTListingTable";
 import { ListingI, MListedNFTTokenI, Token, TokenType } from "../../types";
@@ -376,8 +380,12 @@ export const Account: React.FC = () => {
             }
           : token;
 
+      const nautilusVoiStaking = 421076;
       for (let i = 0; i < selectedNfts.length; i++) {
         const nft = selectedNfts[i];
+        const whichMP206 = [nautilusVoiStaking].includes(nft.contractId)
+          ? CTCINFO_MP206_2
+          : CTCINFO_MP206;
         const customR = await mp.list(
           activeAccount.address,
           nft,
@@ -390,7 +398,7 @@ export const Account: React.FC = () => {
             wrappedNetworkTokenId: TOKEN_WVOI,
             extraTxns: [],
             enforceRoyalties: false,
-            mpContractId: CTCINFO_MP206,
+            mpContractId: whichMP206,
             listingBoxPaymentOverride: ListingBoxCost + i,
             skipEnsure: true,
           }
@@ -407,6 +415,8 @@ export const Account: React.FC = () => {
       const chunkSize = 3;
       for (let i = 0; i < buildN.length; i += chunkSize) {
         const extraTxns = buildN.slice(i, i + chunkSize).flat();
+        console.log({ extraTxns });
+
         const ci = new CONTRACT(
           CTCINFO_MP206,
           algodClient,
@@ -835,28 +845,30 @@ export const Account: React.FC = () => {
         );
         //.then(sendTransactions);
 
+        await algodClient.sendRawTransaction(res as Uint8Array[]).do();
+
         // ---------------------------------------
         // QUEST HERE
         // list nft for sale
         // ---------------------------------------
-        do {
-          const address = activeAccount.address;
-          const actions: string[] = [QUEST_ACTION.NFT_TRANSFER];
-          const {
-            data: { results },
-          } = await getActions(address);
-          for (const action of actions) {
-            const address = activeAccount.address;
-            const key = `${action}:${address}`;
-            const completedAction = results.find((el: any) => el.key === key);
-            if (!completedAction) {
-              await submitAction(action, address, {
-                contractId,
-              });
-            }
-            // TODO notify quest completion here
-          }
-        } while (0);
+        // do {
+        //   const address = activeAccount.address;
+        //   const actions: string[] = [QUEST_ACTION.NFT_TRANSFER];
+        //   const {
+        //     data: { results },
+        //   } = await getActions(address);
+        //   for (const action of actions) {
+        //     const address = activeAccount.address;
+        //     const key = `${action}:${address}`;
+        //     const completedAction = results.find((el: any) => el.key === key);
+        //     if (!completedAction) {
+        //       await submitAction(action, address, {
+        //         contractId,
+        //       });
+        //     }
+        //     // TODO notify quest completion here
+        //   }
+        // } while (0);
         // ---------------------------------------
       }
       toast.success(`NFT Transfer successful!`);
@@ -1310,7 +1322,7 @@ export const Account: React.FC = () => {
                     >
                       List
                     </Button>
-                    {false && selected.length === 1 ? (
+                    {selected.length === 1 ? (
                       <Button
                         onClick={() => {
                           setOpenTransferBatch(true);

@@ -137,6 +137,8 @@ export const Collections: React.FC = () => {
     smartTokenStatus,
   });
 
+
+
   const rankings: any = useMemo(() => {
     if (
       !tokens ||

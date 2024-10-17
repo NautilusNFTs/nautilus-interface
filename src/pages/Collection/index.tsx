@@ -27,7 +27,7 @@ import { getListings } from "../../store/listingSlice";
 import { getTokens } from "../../store/tokenSlice";
 import { BigNumber } from "bignumber.js";
 import { getSmartTokens } from "../../store/smartTokenSlice";
-import { getRankings } from "../../utils/mp";
+//import { getRankings } from "../../utils/mp";
 import Grid2 from "@mui/material/Unstable_Grid2/Grid2";
 import CartNftCard from "../../components/CartNFTCard";
 import { ARC72_INDEXER_API, HIGHFORGE_API } from "../../config/arc72-idx";
@@ -378,24 +378,60 @@ export const Collection: React.FC = () => {
     ]
   );
 
+  const [collectionNfts, setCollectionNfts] = React.useState<any[]>([]);
+  useEffect(() => {
+    try {
+      axios
+        .get(`${ARC72_INDEXER_API}/nft-indexer/v1/tokens`, {
+          params: {
+            contractId: id,
+          },
+        })
+        .then(({ data }) => {
+          setCollectionNfts(data.tokens);
+        });
+    } catch (e) {
+      console.log(e);
+    }
+  }, [id]);
+
+  const displayCoverImage = useMemo(() => {
+    if (collectionInfo?.project?.coverImageURL)
+      return collectionInfo?.project?.coverImageURL;
+    if (collectionNfts.length === 0) return "";
+    return collectionInfo?.project?.coverImageURL ||
+      (collectionNfts[0]?.metadata?.image || "").indexOf("ipfs") > -1
+      ? collectionNfts[0]?.metadata?.image
+      : `https://ipfs.io/ipfs/${JSON.parse(
+          collectionNfts[0]?.metadata
+        )?.image.slice(7)}`;
+  }, [collectionInfo, collectionNfts]);
+
+  const displayCollectionName = useMemo(() => {
+    if (collectionInfo?.project?.title) return collectionInfo?.project?.title;
+    if (collectionNfts.length === 0) return "";
+    return JSON.parse(collectionNfts[0]?.metadata)?.name?.replace(
+      /[0-9]*$/,
+      ""
+    );
+  }, [collectionInfo, collectionNfts]);
+
   return (
     <Layout>
       {!isLoading ? (
         <div>
           <BannerContainer
             style={{
-              backgroundImage: `url(${
-                collectionInfo?.project?.coverImageURL ||
-                nfts[0]?.metadata?.image
-              })`,
+              backgroundImage: `url(${displayCoverImage})`,
               backgroundPosition: "center",
               backgroundSize: "cover",
             }}
           >
             <BannerTitleContainer>
               <BannerTitle>
-                {collectionInfo?.project?.title ||
-                  nfts[0]?.metadata?.name?.replace(/[0-9]*$/, "")}
+                {displayCollectionName}
+                {/*collectionInfo?.project?.title ||
+                  nfts[0]?.metadata?.name?.replace(/[0-9]*$/, "")*/}
               </BannerTitle>
             </BannerTitleContainer>
           </BannerContainer>

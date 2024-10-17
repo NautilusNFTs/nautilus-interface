@@ -214,13 +214,20 @@ export const getRankings = (
       ? `${HIGHFORGE_CDN}/i/${stripTrailingZeroBytes(
           encodeURIComponent(token.metadataURI)
         )}?w=240`
-      : stripTrailingZeroBytes(token.metadata.image);
+      : stripTrailingZeroBytes(token.metadata?.image);
+
+    console.log({ token, metadata: token.metadata });
+
+    const image = stripTrailingZeroBytes(token?.metadata?.image || "");
+
+    const name = `${token?.metadata?.name?.replace(/[0-9 #]*$/, "")}`;
+
     return {
       collectionId: kv[0],
-      image: stripTrailingZeroBytes(token.metadata.image),
+      image,
       floorPrice,
       volume,
-      name: `${token?.metadata?.name?.replace(/[0-9 #]*$/, "")}`,
+      name,
       score: `${Math.round(volume).toLocaleString()}`,
       rank: volume,
       scoreUnit: "VOI",
@@ -238,7 +245,7 @@ export const getRankings = (
       return b.rank - a.rank;
     }
   });
-  return rankings;
+  return rankings.filter((r: RankingI) => r.name != "undefined");
 };
 
 export const compactAddress = (address: string) =>

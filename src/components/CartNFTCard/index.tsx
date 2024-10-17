@@ -531,6 +531,11 @@ const CartNftCard: React.FC<NFTCardProps> = ({
   const url = !collectionsMissingImage.includes(Number(token.contractId))
     ? `${HIGHFORGE_CDN}/i/${encodeURIComponent(token.metadataURI)}?w=400`
     : metadata.image;
+
+  const displayName = (metadata.name || "").match(/[0-9]/)
+    ? metadata.name
+    : `${metadata.name} #${token.tokenId}`;
+
   return display ? (
     <Box
       style={{
@@ -575,7 +580,7 @@ const CartNftCard: React.FC<NFTCardProps> = ({
             }}
           >
             <Stack gap={1}>
-              <CollectionName>{metadata.name}</CollectionName>
+              <CollectionName>{displayName}</CollectionName>
               <CollectionVolume>
                 {price !== "0" ? (
                   <Stack direction="row" gap={1} sx={{ alignItems: "center" }}>
@@ -612,6 +617,7 @@ const CartNftCard: React.FC<NFTCardProps> = ({
       </Box>
       {activeAccount && openBuyModal && listing ? (
         <BuySaleModal
+          token={token}
           listing={listing}
           seller={listing.seller}
           open={openBuyModal}

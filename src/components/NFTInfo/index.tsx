@@ -267,6 +267,8 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
   loading,
   exchangeRate,
 }) => {
+  console.log({ nft, collection, collectionInfo, loading, exchangeRate });
+
   /* Wallet */
   const { activeAccount, signTransactions } = useWallet();
   /* Modal */
@@ -301,7 +303,7 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
   useEffect(() => {
     dispatch(getSmartTokens() as unknown as UnknownAction);
   }, [dispatch]);
-
+ 
   const handleDeleteListing = async (listingId: number) => {
     try {
       const ci = new CONTRACT(
@@ -1534,6 +1536,35 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
 
   console.log({ currency, currencySymbol, currencyDecimals, price, nft });
 
+  const displayImage =
+    (nft.metadata?.image || "").indexOf("ipfs://") >= 0
+      ? `https://ipfs.io/ipfs/${nft.metadata?.image?.replace("ipfs://", "")}`
+      : nft.metadata?.image;
+
+  const displayCoverImage =
+    (collection[0]?.metadata?.image || "").indexOf("ipfs://") >= 0
+      ? `https://ipfs.io/ipfs/${collection[0].metadata.image?.replace(
+          "ipfs://",
+          ""
+        )}`
+      : collection[0]?.metadata?.image;
+
+  const displayName = (nft.metadata?.name || "").match(/[0-9]/)
+    ? nft.metadata?.name
+    : nft.metadata?.name + " #" + nft.tokenId;
+
+  const [owner, setOwner] = useState<string | undefined>(nft.owner);
+  useEffect(() => {
+    if (!nft) return;
+    const ci = new arc72(nft.contractId, algodClient, indexerClient);
+    ci.arc72_ownerOf(nft.tokenId).then((res: any) => {
+      console.log({ res });
+      if (res.success) {
+        setOwner(res.returnValue);
+      }
+    });
+  }, [nft]);
+
   return !loading ? (
     <>
       <Grid
@@ -1547,7 +1578,7 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
         <Grid item xs={12} md={6}>
           {!loading ? (
             <img
-              src={nft.metadata?.image}
+              src={displayImage}
               style={{ width: "100%", borderRadius: "16px" }}
             />
           ) : (
@@ -1578,9 +1609,10 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
                       width: "45px",
                       background: `url(${
                         collectionInfo?.project?.coverImageURL ||
-                        collection[0].metadata.image
+                        displayCoverImage
                       })`,
-                      backgroundSize: "contain",
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
                     }}
                   >
                     &nbsp;
@@ -1597,9 +1629,8 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
                   </span>
                 </AvatarWithName>
               ))(algosdk.getApplicationAddress(nft?.contractId || 0))}
-
               <NFTName style={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
-                {nft.metadata?.name || ""}
+                {displayName}
               </NFTName>
               {nft.owner ? (
                 <AvatarWithOwnerName direction="row" style={{ gap: "6px" }}>
