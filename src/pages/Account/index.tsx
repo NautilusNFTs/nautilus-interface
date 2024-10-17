@@ -381,11 +381,15 @@ export const Account: React.FC = () => {
           : token;
 
       const nautilusVoiStaking = 421076;
+
+      console.log({ selectedNfts });
+
       for (let i = 0; i < selectedNfts.length; i++) {
         const nft = selectedNfts[i];
-        const whichMP206 = [nautilusVoiStaking].includes(nft.contractId)
-          ? CTCINFO_MP206_2
-          : CTCINFO_MP206;
+        const whichMP206 = CTCINFO_MP206;
+        // [nautilusVoiStaking].includes(nft.contractId)
+        //   ? CTCINFO_MP206_2
+        //   : CTCINFO_MP206;
         const customR = await mp.list(
           activeAccount.address,
           nft,
@@ -736,7 +740,7 @@ export const Account: React.FC = () => {
               );
               buildN.push({
                 ...txnO.obj,
-                payment: 28500 + i,
+                payment: 28501 + i,
                 paymentNote: new TextEncoder().encode(`
                 payment to application to satisfy min balance for creating future boxes
                 `),
