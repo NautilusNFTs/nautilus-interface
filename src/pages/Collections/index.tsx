@@ -122,20 +122,6 @@ export const Collections: React.FC = () => {
   // !Replaced data fetching and state management with react-query hooks
   const { data: listings, status: listingsStatus } = useListings();
 
-  console.log({
-    collectionInfo,
-    prices,
-    tokens,
-    collections,
-    sales,
-    listings,
-    smartTokens,
-    tokenStatus,
-    tokenError,
-    collectionStatus,
-    salesStatus,
-    smartTokenStatus,
-  });
 
 
 

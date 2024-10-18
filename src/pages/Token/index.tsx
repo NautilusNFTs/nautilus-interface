@@ -602,23 +602,6 @@ export const Token: React.FC = () => {
     return listedNfts;
   }, [collection, listings]);
 
-  const [account, setAccount] = React.useState<any>(null);
-  useEffect(() => {
-    if (!nft) return;
-    axios
-      .get(`https://mainnet-idx.nautilus.sh/v1/scs/accounts`, {
-        params: {
-          contractId: nft.tokenId,
-        },
-      })
-      .then(({ data: { accounts } }) => {
-        if (accounts.length === 0) return;
-        const account = accounts[0];
-        setAccount(account);
-      });
-  }, [nft]);
-  console.log({ account });
-
   // const moreNfts = useMemo(() => {
   //   if (!nft) return [];
   //   return listedNfts?.filter((el: any) => el.tokenId !== nft.tokenId);

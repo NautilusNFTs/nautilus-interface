@@ -64,6 +64,7 @@ import {
 } from "@/components/Navbar/hooks/collections";
 import { GridLoader } from "react-spinners";
 import { useWallet } from "@txnlab/use-wallet-react";
+import InfoIcon from "@mui/icons-material/Info";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -898,6 +899,50 @@ export const Account: React.FC = () => {
     }
   };
 
+  const handleBurnStaking = async () => {
+    if (!activeAccount) return;
+    const ci = new CONTRACT(
+      Number(nfts[selected[0]].contractId),
+      algodClient,
+      indexerClient,
+      {
+        name: "OSARC72Token",
+        methods: [
+          {
+            name: "burn",
+            args: [
+              {
+                type: "uint64",
+                name: "tokenId",
+              },
+            ],
+            readonly: false,
+            returns: {
+              type: "void",
+            },
+            desc: "Burn an NFT",
+          },
+        ],
+        events: [],
+      },
+      {
+        addr: activeAccount.address,
+        sk: new Uint8Array(0),
+      }
+    );
+    ci.setFee(3000);
+    const burnR = await ci.burn(BigInt(nfts[selected[0]].tokenId));
+    if (burnR.success) {
+      signTransactions(
+        burnR.txns.map(
+          (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
+        )
+      ).then((txns) => {
+        algodClient.sendRawTransaction(txns as Uint8Array[]).do();
+      });
+    }
+  };
+
   const handleBurn = async () => {
     if (!selected.length) return;
     try {
@@ -1335,8 +1380,25 @@ export const Account: React.FC = () => {
                         Transfer
                       </Button>
                     ) : null}
+                    {selected.length === 1 &&
+                    nfts[selected[0]].contractId === 421076 ? (
+                      <Button onClick={handleBurnStaking}>
+                        Burn Staking NFT{` `}
+                        <Tooltip
+                          title={
+                            <div>
+                              Burn staking NFT to regain ownership of the
+                              staking contract.
+                            </div>
+                          }
+                        >
+                          <InfoIcon />
+                        </Tooltip>
+                      </Button>
+                    ) : null}
                   </>
                 ) : null}
+
                 <Button
                   onClick={() => {
                     setSelected([]);

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo } from "react";
 import Layout from "../../layouts/Default";
 import {
   Box,
+  Button,
   Container,
   Grid,
   Skeleton,
@@ -32,6 +33,9 @@ import Grid2 from "@mui/material/Unstable_Grid2/Grid2";
 import CartNftCard from "../../components/CartNFTCard";
 import { ARC72_INDEXER_API, HIGHFORGE_API } from "../../config/arc72-idx";
 import { stripTrailingZeroBytes } from "@/utils/string";
+import { useWallet } from "@txnlab/use-wallet-react";
+import MintModal from "@/components/modals/MintModal";
+import { stakingRewards } from "@/static/staking/staking";
 
 const StatContainer = styled(Stack)`
   display: flex;
@@ -416,6 +420,43 @@ export const Collection: React.FC = () => {
     );
   }, [collectionInfo, collectionNfts]);
 
+  const { activeAccount } = useWallet();
+
+  const [accounts, setAccounts] = React.useState<any[]>([]);
+  React.useEffect(() => {
+    if (!activeAccount) return;
+    axios
+      .get(`https://mainnet-idx.nautilus.sh/v1/scs/accounts`, {
+        params: {
+          owner: activeAccount.address,
+        },
+      })
+      .then(({ data: { accounts } }) => {
+        setAccounts(
+          accounts.map((account: any) => {
+            const reward = stakingRewards.find(
+              (reward) => `${reward.contractId}` === `${account.contractId}`
+            );
+            return {
+              ...account,
+              global_initial:
+                reward?.initial ||
+                account.global_initial ||
+                account?.global_initial ||
+                0,
+              global_total:
+                reward?.total ||
+                reward?.global_total ||
+                account?.global_total ||
+                0,
+            };
+          })
+        );
+      });
+  }, [activeAccount]);
+
+  const [isMintModalVisible, setIsMintModalVisible] = React.useState(false);
+
   return (
     <Layout>
       {!isLoading ? (
@@ -436,7 +477,7 @@ export const Collection: React.FC = () => {
             </BannerTitleContainer>
           </BannerContainer>
           <Grid container spacing={2}>
-            <Grid
+            {/*<Grid
               item
               sx={{ display: { xs: "none", sm: "block" } }}
               xs={12}
@@ -444,6 +485,7 @@ export const Collection: React.FC = () => {
             >
               &nbsp;
             </Grid>
+            */}
             <Grid item xs={12} sm={12}>
               <Stack sx={{ mt: 5 }} gap={2}>
                 <StatContainer
@@ -522,6 +564,20 @@ export const Collection: React.FC = () => {
                     ) : null
                   )}
                 </StatContainer>
+                {accounts.length > 0 && id === "421076" ? (
+                  <Box>
+                    <Button
+                      size="large"
+                      variant="contained"
+                      color="primary"
+                      onClick={() => {
+                        setIsMintModalVisible(true);
+                      }}
+                    >
+                      Mint
+                    </Button>
+                  </Box>
+                ) : null}
                 {/*<Stack
                   direction="row"
                   spacing={2}
@@ -606,6 +662,18 @@ export const Collection: React.FC = () => {
           </Stack>
         </Container>
       )}
+      {id === "421076" ? (
+        <MintModal
+          collectionId={Number(id)}
+          title="Mint Nautilus Voi Staking NFT"
+          handleClose={() => {
+            setIsMintModalVisible(false);
+          }}
+          open={isMintModalVisible}
+          accounts={accounts}
+          buttonText="Mint"
+        />
+      ) : null}
     </Layout>
   );
 };
