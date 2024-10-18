@@ -99,12 +99,17 @@ const NFTTabs: React.FC<NFTTabsProps> = ({ nft, loading, exchangeRate }) => {
         if (accounts.length === 0) return;
         const account = accounts[0];
         const reward = stakingRewards.find(
-          (reward) => reward.contractId === account.contractId
+          (reward) => `${reward.contractId}` === `${account.contractId}`
         );
         setAccount({
           ...account,
+          global_initial:
+            reward?.initial ||
+            account.global_initial ||
+            account?.global_initial ||
+            0,
           global_total:
-            reward?.global_total || reward?.total || account.global_total,
+            reward?.total || reward?.global_total || account?.global_total || 0,
         });
       });
   }, [nft]);
@@ -235,14 +240,14 @@ const NFTTabs: React.FC<NFTTabsProps> = ({ nft, loading, exchangeRate }) => {
               <strong>Stake Amount:</strong>{" "}
               {account.global_period > 5
                 ? `${account.global_initial / 10 ** 6} VOI`
-                : `${account.global_initial / 10 ** 6} VOI`}
+                : `${formatter.format(account.global_initial / 10 ** 6)} VOI`}
             </Typography>
             <Typography variant="body2">
               <strong>Est. Total Tokens:</strong>
               {` `}
               {account.global_period > 5
                 ? `${account.global_total / 10 ** 6} VOI`
-                : `${account.global_total / 10 ** 6} VOI`}
+                : `${formatter.format(account.global_total)} VOI`}
             </Typography>
           </Box>
         ) : (
