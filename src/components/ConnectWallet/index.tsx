@@ -1,7 +1,7 @@
 import * as React from "react";
 import Menu from "@mui/material/Menu";
 import styled from "styled-components";
-import { Box, MenuItem, Select } from "@mui/material";
+import { Box, Divider, MenuItem, Select, Typography } from "@mui/material";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import { Link } from "react-router-dom";
@@ -13,6 +13,7 @@ import {
 } from "../../config/quest";
 import { useWallet } from "@txnlab/use-wallet-react";
 import { ArrowDownward } from "@mui/icons-material";
+import { currentVersion, deploymentVersion } from "@/contants/versions";
 
 const WalletIcon2 = () => {
   return (
@@ -605,6 +606,12 @@ function BasicMenu() {
               )}
             </ProviderContainer>
           ))}
+          <Divider />
+          <Box>
+            <Typography variant="body2" className="text-right">
+              Nautilus Ver {currentVersion}.{deploymentVersion}
+            </Typography>
+          </Box>
           {/*providers?.map((provider) => {
             return (
               <ProviderContainer className={`${isDarkTheme?"dark":""} !bg-secondary !text-primary`}>

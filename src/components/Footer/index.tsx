@@ -4,8 +4,9 @@ import LightLogo from "../../static/logo-light.svg";
 import DarkLogo from "../../static/logo-dark.svg";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
-import { Grid } from "@mui/material";
+import { Box, Grid, Stack } from "@mui/material";
 import { Link } from "react-router-dom";
+import { currentVersion, deploymentVersion } from "@/contants/versions";
 
 const FooterRoot = styled.footer`
   position: absolute;
@@ -170,7 +171,7 @@ const Footer: React.FC = () => {
   );
   return (
     <FooterRoot
-    className="md:py-20 md:px-16 p-4"
+      className="md:py-20 md:px-16 p-4"
       style={{ background: isDarkTheme ? "rgb(22, 23, 23)" : undefined }}
     >
       <Grid container spacing={3}>
@@ -184,16 +185,16 @@ const Footer: React.FC = () => {
             </Description>
             <SocialContainer>
               <SocialHeading>Join us</SocialHeading>
-              <SocialButtonGroup >
+              <SocialButtonGroup>
                 <Link to="https://x.com/NautilusNFTs" target="_blank">
                   <IconContainer>
-                    <XIcon  />
+                    <XIcon />
                   </IconContainer>
                 </Link>
                 <Link to="https://discord.gg/qp3FT47txs" target="_blank">
-                <IconContainer>
-                  <DiscordIcon />
-                </IconContainer>
+                  <IconContainer>
+                    <DiscordIcon />
+                  </IconContainer>
                 </Link>
               </SocialButtonGroup>
             </SocialContainer>
@@ -234,7 +235,17 @@ const Footer: React.FC = () => {
           </Grid>
         </Grid>
         <Grid item xs={12}>
-          <Copyright>© 2024 Nautilus. All Rights Reserved.</Copyright>
+          <Stack
+            direction="row"
+            spacing={2}
+            alignItems="center"
+            sx={{ justifyContent: "space-between" }}
+          >
+            <Copyright>© 2024 Nautilus. All Rights Reserved.</Copyright>
+            <Box sx={{ px: 5 }}>
+              Ver {currentVersion}.{deploymentVersion}
+            </Box>
+          </Stack>
         </Grid>
       </Grid>
     </FooterRoot>

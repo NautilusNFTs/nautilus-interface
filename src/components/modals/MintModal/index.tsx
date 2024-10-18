@@ -282,6 +282,9 @@ const MintModal: React.FC<MintModalProps> = ({
                   onChange={handleChange}
                 />
               </Grid>
+              <Grid item xs={12}>
+                <Typography variant="h6">Contract Details</Typography>
+              </Grid>
               {accounts
                 .filter((el) => el.contractId === Number(contractId))
                 .map((el) => (
