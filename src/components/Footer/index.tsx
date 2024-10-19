@@ -4,7 +4,7 @@ import LightLogo from "../../static/logo-light.svg";
 import DarkLogo from "../../static/logo-dark.svg";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
-import { Box, Grid, Stack } from "@mui/material";
+import { Box, Grid, Stack, Typography } from "@mui/material";
 import { Link } from "react-router-dom";
 import { currentVersion, deploymentVersion } from "@/contants/versions";
 
@@ -15,21 +15,6 @@ const FooterRoot = styled.footer`
   padding-bottom: 80px;
   padding-right: 0px;
   /* padding-left: 80px; */
-`;
-
-const FooterContainer = styled.div`
-  width: 1280px; /* Fill (1,280px) */
-  height: fit-content; /* Hug (412px) */
-  gap: 64px;
-  display: flex;
-  flex-direction: column;
-`;
-
-const HorizontalContainer = styled.div`
-  width: 1280px; /* Fill (1,280px) */
-  height: fit-content; /* Hug (292px) */
-  display: flex;
-  justify-content: space-between; /* Justify: space-between */
 `;
 
 const Container = styled.div`
@@ -70,7 +55,6 @@ const Copyright = styled.div`
   line-height: 24px;
   letter-spacing: 0px;
   text-align: center;
-  width: 303px;
   height: 24px;
   color: #68727d;
 `;
@@ -242,10 +226,17 @@ const Footer: React.FC = () => {
             sx={{ justifyContent: "space-between" }}
           >
             <Copyright>© 2024 Nautilus. All Rights Reserved.</Copyright>
-            <Box sx={{ px: 5 }}>
-              Ver {currentVersion}.{deploymentVersion}
-            </Box>
           </Stack>
+        </Grid>
+        <Grid item xs={12}>
+          <Typography
+            align="left"
+            sx={{ color: isDarkTheme ? "white" : "black" }}
+            variant="body2"
+            color="textSecondary"
+          >
+            Ver {currentVersion}.{deploymentVersion}
+          </Typography>
         </Grid>
       </Grid>
     </FooterRoot>
