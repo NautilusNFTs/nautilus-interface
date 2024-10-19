@@ -450,7 +450,7 @@ const CartNftCard: React.FC<NFTCardProps> = ({
           const returnValue = swapR.response.txnGroups[0].txnResults
             .slice(-1)[0]
             .txnResult.logs.slice(-1)[0];
-            
+
           const selector = returnValue.slice(0, 4).toString("hex");
           const outA = algosdk.bytesToBigInt(returnValue.slice(4, 36));
           const outB = algosdk.bytesToBigInt(returnValue.slice(36, 68));
@@ -599,7 +599,7 @@ const CartNftCard: React.FC<NFTCardProps> = ({
             </Stack>
             {price !== "0" ? (
               <img
-                style={{ zIndex: 1000 }}
+                style={{ zIndex: 2 }}
                 height="40"
                 width="40"
                 src="/static/icon-cart.png"

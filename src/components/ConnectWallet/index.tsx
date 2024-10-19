@@ -511,12 +511,14 @@ function BasicMenu() {
           }}
         >
           <AccountDropdownLabel className="light">
-            {activeAccount?.address.slice(0, 4)}
+            {activeAccount?.address.slice(0, 4)}...
+            {activeAccount?.address.slice(-4)}
           </AccountDropdownLabel>
           <StyledWalletIcon />
         </AccountDropdown>
       )}
       <AccountMenu
+        style={{ pointerEvents: "auto" }}
         id="basic-menu"
         anchorEl={anchorEl}
         open={open}
@@ -564,8 +566,10 @@ function BasicMenu() {
                 {wallet.isActive ? (
                   <Box
                     onClick={(e: any) => {
-                      wallet.disconnect();
-                      setAnchorEl(null);
+                      e.preventDefault();
+                      wallet.disconnect().then(() => {
+                        setAnchorEl(null);
+                      });
                     }}
                   >
                     <DisconnectButton />
@@ -584,6 +588,7 @@ function BasicMenu() {
               </ProviderIconContainer>
               {wallet.isActive && wallet.accounts.length > 0 ? (
                 <Select
+                  sx={{ pointerEvents: "auto", overflowY: "auto" }}
                   fullWidth
                   size="small"
                   className="classic-select"
@@ -595,7 +600,11 @@ function BasicMenu() {
                 >
                   {wallet.accounts.map((account) => {
                     return (
-                      <MenuItem value={account.address} key={account.address}>
+                      <MenuItem
+                        sx={{ pointerEvents: "auto" }}
+                        value={account.address}
+                        key={account.address}
+                      >
                         {account.address}
                       </MenuItem>
                     );
@@ -612,100 +621,7 @@ function BasicMenu() {
               Nautilus Ver {currentVersion}.{deploymentVersion}
             </Typography>
           </Box>
-          {/*providers?.map((provider) => {
-            return (
-              <ProviderContainer className={`${isDarkTheme?"dark":""} !bg-secondary !text-primary`}>
-                <ProviderIconContainer>
-                  <ProviderName>
-                    <WalletIcon
-                      style={{
-                        background: `url(${provider.metadata.icon}) lightgray 50% / cover no-repeat`,
-                      }}
-                    />
-                    <ProviderNameLabel className={`${isDarkTheme?"dark":""} !bg-secondary !text-primary`}>
-                      {provider.metadata.name}
-                    </ProviderNameLabel>
-                    <Wallet />
-                  </ProviderName>
-                  {connectedAccounts?.some(
-                    (el: any) => el.providerId === provider.metadata.id
-                  ) ? (
-                    <Box
-                      onClick={(e: any) => {
-                        const provider = providers?.find(
-                          (p) => p.metadata.id === activeAccount?.providerId
-                        );
-                        provider?.disconnect();
-                      }}
-                    >
-                      <DisconnectButton />
-                    </Box>
-                  ) : (
-                    <Box
-                      onClick={(e: any) => {
-                        provider?.connect();
-                        if (provider?.metadata.id !== PROVIDER_ID.KIBISIS) {
-                          setAnchorEl(null);
-                        }
-                      }}
-                    >
-                      <ConnectButton />
-                    </Box>
-                  )}
-                </ProviderIconContainer>
-                <ConnectedAccountContainer
-                className={`${isDarkTheme?"dark":""} !bg-secondary !text-primary`}
-                //  className="!bg-background !text-primary"
-                 >
-                  {connectedAccounts
-                    ?.filter((a) => a.providerId === provider.metadata.id)
-                    .map((account, key) => {
-                      return (
-                        <AccountContainer
-                        className="!flex gap-2 !bg-secondary !text-primary "
-                          key={`${key}_${account?.address ?? "account"}`}
-                        >
-                          <AccountNameContainer>
-                            <AccountName
-                            className={`${isDarkTheme?"dark":""} !bg-secondary !text-primary`}>
-                              {account.address.slice(0, 4)}
-                            </AccountName>
-                          </AccountNameContainer>
-                          <ActiveButtonContainer>
-                            {account.address !== activeAccount?.address ? (
-                              <ActiveButton
-                                onClick={(e: any) => {
-                                  provider?.setActiveProvider();
-                                  provider?.setActiveAccount(account.address);
-                                }}
-                              >
-                                Set Active
-                              </ActiveButton>
-                            ) : (
-                              <Link to={`/account/${account.address}`}>
-                                <ActiveButton>View gallery</ActiveButton>
-                              </Link>
-                            )}
-                          </ActiveButtonContainer>
-                        </AccountContainer>
-                      );
-                    })}
-                </ConnectedAccountContainer>
-              </ProviderContainer>
-            );
-          })*/}
         </WalletContainer>
-        {/*<MenuItem
-          onClick={(e) => {
-            const provider = providers?.find(
-              (p) => p.metadata.id === activeAccount?.providerId
-            );
-            provider?.disconnect();
-          }}
-        >
-          Disconnect
-        </MenuItem>
-        */}
       </AccountMenu>
     </div>
   );
