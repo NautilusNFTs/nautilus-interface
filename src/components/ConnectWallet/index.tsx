@@ -574,7 +574,7 @@ function BasicMenu() {
                   <Box
                     onClick={(e: any) => {
                       wallet.connect().then(() => {
-                        //setAnchorEl(null);
+                        setAnchorEl(null);
                       });
                     }}
                   >

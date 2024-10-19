@@ -20,7 +20,7 @@ import algosdk from "algosdk";
 //import { MarketplaceContext } from "../../store/MarketplaceContext";
 import { decodePrice, decodeTokenId } from "../../utils/mp";
 import NftCard from "../../components/NFTCard";
-import BuySaleModal from "../../components/modals/BuySaleModal";
+import BuySaleModal, { multiplier } from "../../components/modals/BuySaleModal";
 // @ts-ignore
 import { CONTRACT, arc72, arc200, mp, abi, swap } from "ulujs";
 import { getAlgorandClients } from "../../wallets";
@@ -303,7 +303,7 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
   useEffect(() => {
     dispatch(getSmartTokens() as unknown as UnknownAction);
   }, [dispatch]);
- 
+
   const handleDeleteListing = async (listingId: number) => {
     try {
       const ci = new CONTRACT(
@@ -1312,69 +1312,92 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
       // -------------------------------------
       // SIM HERE
       // -------------------------------------
+      const { algodClient, indexerClient } = getAlgorandClients();
       let customR;
-      console.log({ pool });
-      if (pool) {
-        const { algodClient, indexerClient } = getAlgorandClients();
-        const { contractId: poolId, tokAId, tokBId } = pool;
-
-        const ciTokA = new arc200(Number(tokAId), algodClient, indexerClient);
-        const ciTokB = new arc200(Number(tokBId), algodClient, indexerClient);
-        const arc200_balanceOfTokA = await ciTokA.arc200_balanceOf(
-          activeAccount.address
-        );
-        const arc200_balanceOfTokB = await ciTokB.arc200_balanceOf(
-          activeAccount.address
-        );
-        console.log({ arc200_balanceOfTokA, arc200_balanceOfTokB });
-        // -------------------------------------
-        const tokA: TokenType = smartTokens.find(
-          (el: any) => `${el.contractId}` === tokAId
-        );
-        const tokB: TokenType = smartTokens.find(
-          (el: any) => `${el.contractId}` === tokBId
-        );
-        const inToken = tokA?.tokenId === "0" ? tokA : tokB;
-        const outToken = tokA?.tokenId !== "0" ? tokA : tokB;
-        console.log({ tokA, tokB });
-        // figure out how much to swap
-        const swapR: any = await new swap(
-          poolId,
-          algodClient,
-          indexerClient
-        ).swap(
-          activeAccount.address,
-          poolId,
-          {
-            amount: new BigNumber(currency.price)
-              .times(priceBn.minus(new BigNumber(discount || 0)))
-              .times(1.03)
-              .toFixed(6),
-            contractId: inToken?.contractId,
-            tokenId: "0",
-            symbol: "VOI",
-          },
-          {
-            contractId: outToken?.contractId,
-            symbol: outToken?.symbol,
-            decimals: `${outToken?.decimals}`,
-          }
-        );
-        if (!swapR.success) throw new Error("swap failed");
-        console.log({ swapR });
-        const returnValue = swapR.response.txnGroups[0].txnResults
-          .slice(-1)[0]
-          .txnResult.logs.slice(-1)[0];
-        const selector = returnValue.slice(0, 4).toString("hex");
-        const outA = algosdk.bytesToBigInt(returnValue.slice(4, 36));
-        const outB = algosdk.bytesToBigInt(returnValue.slice(36, 68));
-        customR = await handleBuy(
-          activeAccount.address,
-          nft.listing,
-          swapR.objs
-        );
-      } else {
-        customR = await handleBuy(activeAccount.address, nft.listing);
+      for (const skipEnsure of [true, false]) {
+        if (pool) {
+          // -------------------------------------
+          const {
+            contractId: poolId,
+            tokAId,
+            tokBId,
+            poolBalA,
+            poolBalB,
+          } = pool;
+          // -------------------------------------
+          const tokA: TokenType = smartTokens.find(
+            (el: any) => `${el.contractId}` === tokAId
+          );
+          const tokB: TokenType = smartTokens.find(
+            (el: any) => `${el.contractId}` === tokBId
+          );
+          const inToken = tokA?.tokenId === "0" ? tokA : tokB;
+          const outToken = tokA?.tokenId !== "0" ? tokA : tokB;
+          const ratio =
+            inToken === tokA
+              ? new BigNumber(poolBalA).div(poolBalB).toNumber()
+              : new BigNumber(poolBalB).div(poolBalA).toNumber();
+          // figure out how much to swap
+          const swapR: any = await new swap(
+            poolId,
+            algodClient,
+            indexerClient
+          ).swap(
+            activeAccount.address,
+            poolId,
+            {
+              amount: new BigNumber(ratio)
+                .times(priceBn.minus(new BigNumber(discount || 0)))
+                .times(multiplier)
+                .toFixed(6),
+              contractId: inToken?.contractId,
+              tokenId: "0",
+              symbol: "VOI",
+            },
+            {
+              contractId: outToken?.contractId,
+              symbol: outToken?.symbol,
+              decimals: `${outToken?.decimals}`,
+            }
+          );
+          if (!swapR.success) throw new Error("swap failed");
+          const returnValue = swapR.response.txnGroups[0].txnResults
+            .slice(-1)[0]
+            .txnResult.logs.slice(-1)[0];
+          const selector = returnValue.slice(0, 4).toString("hex");
+          const outA = algosdk.bytesToBigInt(returnValue.slice(4, 36));
+          const outB = algosdk.bytesToBigInt(returnValue.slice(36, 68));
+          customR = await mp.buy(activeAccount.address, nft.listing, currency, {
+            paymentTokenId:
+              nft.listing.currency === 0 ? TOKEN_WVOI : nft.listing.currency,
+            wrappedNetworkTokenId: TOKEN_WVOI,
+            extraTxns: swapR.objs,
+            algodClient,
+            indexerClient,
+            skipEnsure,
+          });
+        } else {
+          // no pool
+          const paymentToken = smartTokens.find(
+            (el: any) => `${el.contractId}` === `${nft.listing.currency}`
+          );
+          console.log({ paymentToken });
+          customR = await mp.buy(
+            activeAccount.address,
+            nft.listing,
+            paymentToken,
+            {
+              paymentTokenId:
+                nft.listing.currency === 0 ? TOKEN_WVOI : nft.listing.currency,
+              wrappedNetworkTokenId: TOKEN_WVOI,
+              extraTxns: [],
+              algodClient,
+              indexerClient,
+              skipEnsure,
+            }
+          );
+        }
+        if (customR.success) break;
       }
       console.log({ customR });
       if (!customR.success) throw new Error("custed failed at end"); // abort
@@ -1877,6 +1900,7 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
       />
       {nft.listing ? (
         <BuySaleModal
+          token={nft}
           listing={nft.listing}
           seller={nft.listing.seller}
           image={nft?.metadata?.image}

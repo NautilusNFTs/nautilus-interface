@@ -402,7 +402,6 @@ const CartNftCard: React.FC<NFTCardProps> = ({
       const { algodClient, indexerClient } = getAlgorandClients();
       let customR;
       for (const skipEnsure of [true, false]) {
-        console.log({ pool });
         if (pool) {
           const {
             contractId: poolId,
@@ -451,6 +450,7 @@ const CartNftCard: React.FC<NFTCardProps> = ({
           const returnValue = swapR.response.txnGroups[0].txnResults
             .slice(-1)[0]
             .txnResult.logs.slice(-1)[0];
+            
           const selector = returnValue.slice(0, 4).toString("hex");
           const outA = algosdk.bytesToBigInt(returnValue.slice(4, 36));
           const outB = algosdk.bytesToBigInt(returnValue.slice(36, 68));
@@ -469,7 +469,6 @@ const CartNftCard: React.FC<NFTCardProps> = ({
           const paymentToken = smartTokens.find(
             (el: any) => `${el.contractId}` === `${listing.currency}`
           );
-          console.log({ paymentToken });
           customR = await mp.buy(activeAccount.address, listing, paymentToken, {
             paymentTokenId:
               listing.currency === 0 ? TOKEN_WVOI : listing.currency,
@@ -480,10 +479,9 @@ const CartNftCard: React.FC<NFTCardProps> = ({
             skipEnsure,
           });
         }
-        console.log({ customR });
-
         if (customR.success) break;
       }
+      console.log({ customR });
       if (!customR.success) throw new Error("custom failed at end"); // abort
       // -------------------------------------
       // SIGM HERE
