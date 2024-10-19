@@ -12,6 +12,8 @@ import { getSmartTokens } from "../../store/smartTokenSlice";
 import { UnknownAction } from "@reduxjs/toolkit";
 import { BigNumber } from "bignumber.js";
 import { stakingRewards } from "@/static/staking/staking";
+import { useStakingContract } from "@/hooks/staking";
+import StakingInformation from "../StakingInformation/StakingInformation";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -86,34 +88,8 @@ const NFTTabs: React.FC<NFTTabsProps> = ({ nft, loading, exchangeRate }) => {
     return tokenSales;
   }, [sales, nft]);
 
-  const [account, setAccount] = React.useState<any>(null);
-  React.useEffect(() => {
-    if (!nft) return;
-    axios
-      .get(`https://mainnet-idx.nautilus.sh/v1/scs/accounts`, {
-        params: {
-          contractId: nft.tokenId,
-        },
-      })
-      .then(({ data: { accounts } }) => {
-        if (accounts.length === 0) return;
-        const account = accounts[0];
-        const reward = stakingRewards.find(
-          (reward) => `${reward.contractId}` === `${account.contractId}`
-        );
-        setAccount({
-          ...account,
-          global_initial:
-            reward?.initial ||
-            account.global_initial ||
-            account?.global_initial ||
-            0,
-          global_total:
-            reward?.total || reward?.global_total || account?.global_total || 0,
-        });
-      });
-  }, [nft]);
-  console.log({ account });
+  const { data: stakingAccountData, isLoading: loadingStakingAccountData } =
+    useStakingContract(nft.tokenId);
 
   return !loading ? (
     <Box sx={{ width: "100%" }}>
@@ -204,64 +180,7 @@ const NFTTabs: React.FC<NFTTabsProps> = ({ nft, loading, exchangeRate }) => {
         )}
       </CustomTabPanel>
       <CustomTabPanel value={value} index={1}>
-        {account ? (
-          <Box>
-            <Typography variant="h6">Account Information</Typography>
-            <Typography variant="body2">
-              <strong>Type:</strong>
-              {` `}
-              {account.global_parent_id === 400350 ? "Staking" : "Airdrop"}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Account ID:</strong>
-              {` `}
-              <a
-                style={{ color: "#93F" }}
-                target="_blank"
-                rel="noreferrer"
-                href={`https://explorer.voi.network/explorer/application/${account.contractId}/transactions`}
-              >
-                {account.contractId}
-              </a>
-            </Typography>
-            <Typography variant="body2">
-              <strong>Lockup:</strong>{" "}
-              {account.global_period > 5
-                ? `${account.global_period} mo`
-                : `${account.global_period} years`}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Vesting:</strong>{" "}
-              {account.global_period > 5
-                ? `${account.global_distribution_count} mo`
-                : `12 years`}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Stake Amount:</strong>{" "}
-              {account.global_period > 5
-                ? `${account.global_initial / 10 ** 6} VOI`
-                : `${formatter.format(account.global_initial / 10 ** 6)} VOI`}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Est. Total Tokens:</strong>
-              {` `}
-              {account.global_period > 5
-                ? `${account.global_total / 10 ** 6} VOI`
-                : `${formatter.format(account.global_total)} VOI`}
-            </Typography>
-          </Box>
-        ) : (
-          <Typography
-            variant="body2"
-            sx={{
-              color: isDarkTheme ? "#fff" : "#000",
-              textAlign: "left",
-              paddingTop: "20px",
-            }}
-          >
-            No account information found
-          </Typography>
-        )}
+        <StakingInformation contractId={nft.tokenId} />
       </CustomTabPanel>
       {/*<CustomTabPanel value={value} index={1}>
         Information

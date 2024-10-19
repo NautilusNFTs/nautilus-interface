@@ -43,6 +43,7 @@ import { decodeRoyalties } from "../../utils/hf";
 import { useWallet } from "@txnlab/use-wallet-react";
 import { TOKEN_WVOI } from "@/contants/tokens";
 import { useAccountInfo } from "../Navbar/hooks";
+import { useStakingContract } from "@/hooks/staking";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -1294,12 +1295,14 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
     );
   }, [activeAccount, manager, nft.listing]);
 
-  // EFFECT: get voi account info
   const {
     data: accInfo,
     isLoading: isBalanceLoading,
     refetch: refetchBalance,
   } = useAccountInfo();
+
+  const { data: stakingAccountData, isLoading: isLoadingStakingAccountData } =
+    useStakingContract(nft.tokenId);
 
   // handleBuy
   const handleBuyClick = async (pool: any, discount: any) => {
@@ -1588,6 +1591,21 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
     });
   }, [nft]);
 
+  const discount = useMemo(() => {
+    if (
+      !nft.listing ||
+      !priceAU ||
+      !stakingAccountData ||
+      isLoadingStakingAccountData ||
+      stakingAccountData.length === 0
+    )
+      return 0;
+    const [stakingAccount] = stakingAccountData;
+    const priceN = new BigNumber(priceAU).div(1e6).toNumber();
+    const totalN = Number(stakingAccount?.global_total);
+    return formatter.format(totalN);
+  }, [nft, priceAU, stakingAccountData, isLoadingStakingAccountData]);
+
   return !loading ? (
     <>
       <Grid
@@ -1767,6 +1785,17 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
                       alt={`${nft.listing.currency}` === "0" ? "VOI" : "VIA"}
                     />
                   ) : null}
+                  {discount ? (
+                    <div
+                      className="price-value"
+                      style={{
+                        color: "#FF5733",
+                        textDecoration: "line-through",
+                      }}
+                    >
+                      {discount} {currencySymbol}
+                    </div>
+                  ) : null}
                   <div
                     className="price-value"
                     style={{
@@ -1833,14 +1862,15 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
                         </Button>
                       </>
                     )
-                  ) : nft.owner === activeAccount?.address ? (
+                  ) : nft.owner === activeAccount?.address ? null : /*
                     <Button
                       variant="text"
                       onClick={() => setOpenListSale(true)}
                     >
                       List for Sale
                     </Button>
-                  ) : null}
+                    */
+                  null}
                   {false && (
                     <OfferButton src={ButtonOffer} alt="Offer Button" />
                   )}

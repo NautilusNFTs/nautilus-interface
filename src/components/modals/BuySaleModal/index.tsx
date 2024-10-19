@@ -24,6 +24,7 @@ import { BigNumber } from "bignumber.js";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { useWallet } from "@txnlab/use-wallet-react";
+import StakingInformation from "@/components/StakingInformation/StakingInformation";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -49,6 +50,7 @@ interface BuySaleModalProps {
 }
 
 const BuySaleModal: React.FC<BuySaleModalProps> = ({
+  token,
   listing,
   seller,
   open,
@@ -390,6 +392,11 @@ const BuySaleModal: React.FC<BuySaleModalProps> = ({
                   </Box>
                 ) : null}
               </Grid>
+              {[421076].includes(Number(token.contractId)) ? (
+                <Grid item xs={12}>
+                  <StakingInformation contractId={Number(token.tokenId)} />
+                </Grid>
+              ) : null}
               <Grid item xs={12}>
                 <Stack sx={{ mt: 3 }} gap={2}>
                   {pool?.contractId ? (

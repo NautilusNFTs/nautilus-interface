@@ -27,6 +27,7 @@ import { formatter } from "../../../utils/number";
 import CartNftCard from "../../CartNFTCard";
 import { TOKEN_WVOI } from "../../../contants/tokens";
 import { useSmartTokens } from "@/components/Navbar/hooks/collections";
+import StakingInformation from "@/components/StakingInformation/StakingInformation";
 
 // function to split array into chunks
 
@@ -199,6 +200,11 @@ const ListBatchModal: React.FC<ListBatchModalProps> = ({
                   }}
                 />
               </Box>*/}
+              {nfts.length === 1 && [421076].includes(nfts[0].contractId) ? (
+                <Box>
+                  <StakingInformation contractId={nfts[0].tokenId} />
+                </Box>
+              ) : null}
               <Box>
                 <Typography variant="caption">
                   {price ? (
