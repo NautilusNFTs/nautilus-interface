@@ -112,7 +112,7 @@ const WalletContainer = styled.div`
 
 const ProviderContainer = styled.div`
   /* Layout */
-  width: 300px;
+  width: 350px;
   display: flex;
   padding: 16px 8px;
   flex-direction: column;
