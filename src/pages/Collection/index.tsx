@@ -51,6 +51,7 @@ import { SearchOutlined } from "@mui/icons-material";
 import { useDebounceCallback } from "usehooks-ts";
 import CollectionSelect from "@/components/CollectionSelect";
 import DiamondIcon from "@mui/icons-material/Diamond";
+import { useMarketplaceListings } from "@/hooks/mp";
 
 const PriceRangeContainer = styled.div`
   display: flex;
@@ -571,25 +572,29 @@ export const Collection: React.FC = () => {
   const debouncedMax = useDebounceCallback(setMax, 500);
 
   /* NFT Navigator Listings */
-  const [listings, setListings] = React.useState<any>([]);
-  React.useEffect(() => {
-    try {
-      const res = axios
-        .get(`${ARC72_INDEXER_API}/nft-indexer/v1/mp/listings`, {
-          params: {
-            active: true,
-            collectionId: id,
-          },
-        })
-        .then(({ data }) => {
-          setListings(data.listings);
-        });
-    } catch (e) {
-      console.log(e);
-    }
-  }, []);
+  // const [listings, setListings] = React.useState<any>([]);
+  // React.useEffect(() => {
+  //   try {
+  //     const res = axios
+  //       .get(`${ARC72_INDEXER_API}/nft-indexer/v1/mp/listings`, {
+  //         params: {
+  //           active: true,
+  //           collectionId: id,
+  //         },
+  //       })
+  //       .then(({ data }) => {
+  //         setListings(data.listings);
+  //       });
+  //   } catch (e) {
+  //     console.log(e);
+  //   }
+  // }, []);
+
+  const { data: listings, isLoading: collectionListingsLoading } =
+    useMarketplaceListings(Number(id));
 
   const normalListings = useMemo(() => {
+    if (collectionListingsLoading) return [];
     return listings?.map((listing: NFTIndexerListingI) => {
       const smartToken = smartTokens.find(
         (token: TokenType) => `${token.contractId}` === `${listing.currency}`
@@ -617,7 +622,7 @@ export const Collection: React.FC = () => {
   }, [normalListings]);
 
   const filteredListings = useMemo(() => {
-    const listings = sortedListings.map((listing: ListingI) => {
+    const listings = sortedListings?.map((listing: ListingI) => {
       const nft = listing.token;
       const metadata = JSON.parse(`${nft?.metadata}`);
       const properties = metadata?.properties || {};
@@ -682,7 +687,9 @@ export const Collection: React.FC = () => {
     }
   }, [sortedListings, search, min, max, currency, collection]);
 
-  const [viewMode, setViewMode] = React.useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = React.useState<"grid" | "list">(
+    id === "421076" ? "list" : "grid"
+  );
 
   // const stats: any = useMemo(() => {
   //   if (
@@ -1123,8 +1130,7 @@ export const Collection: React.FC = () => {
             </Box>
           </Stack>
         </SidebarFilter>
-      </SidebarFilterContainer>
-      */}
+      </SidebarFilterContainer>*/}
       {/*<SidebarFilterContainer>
         <SidebarFilter>
           <Stack
@@ -1173,72 +1179,140 @@ export const Collection: React.FC = () => {
           </BannerTitleContainer>
         </BannerContainer>
         <ListingRoot className="!flex !flex-col lg:!flex-row !items-center md:!items-start">
-          <div className="!hidden sm:!block">{renderSidebar}</div>
+          {viewMode !== "list" ? (
+            <div className="!hidden sm:!block">
+              <Stack gap={5} sx={{ mt: 3 }}>
+                {accounts.length > 0 && id === "421076" ? (
+                  <Button
+                    size="large"
+                    variant="outlined"
+                    color="primary"
+                    onClick={() => {
+                      setIsMintModalVisible(true);
+                    }}
+                  >
+                    Mint
+                  </Button>
+                ) : null}
+
+                {renderSidebar}
+              </Stack>
+            </div>
+          ) : null}
           <div className="sm:!hidden w-full">
             <DialogSearch>{renderSidebar}</DialogSearch>
           </div>
           <ListingContainer>
-            <div className=" items-center flex flex-col sm:grid md:grid-cols-2 xl:grid-cols-3 sm:w-fit gap-4 sm:gap-2">
-              {filteredListings
-                .slice(0, showing)
-                .map((el: NFTIndexerListingI) => {
-                  const pk = `${el.mpContractId}-${el.mpListingId}`;
-                  const listedToken = {
-                    ...el.token,
-                    metadataURI: stripTrailingZeroBytes(el.token.metadataURI),
-                  };
-                  return (
-                    <Grid2 key={pk}>
-                      <CartNftCard
-                        token={listedToken}
-                        listing={el}
-                        onClick={() => {
-                          navigate(
-                            `/collection/${el.token.contractId}/token/${el.token.tokenId}`
-                          );
-                        }}
-                      />
-                    </Grid2>
-                  );
-                })}
-              {showing < sortedListings.length && (
-                <Grid2>
-                  <div
-                    onClick={() => setShowing(showing + 50)}
-                    className={`${
-                      isDarkTheme ? "button-dark" : "button-light"
-                    } cursor-pointer`}
-                  >
-                    <Button
-                      className={
-                        isDarkTheme ? "button-text-dark" : "button-text-light"
-                      }
+            {id === "421076" ? (
+              <Stack direction="row" spacing={2} sx={{ justifyContent: "end" }}>
+                <ToggleButtonGroup
+                  color="primary"
+                  value={viewMode}
+                  exclusive
+                  onChange={() => {
+                    setViewMode(viewMode === "list" ? "grid" : "list");
+                  }}
+                  aria-label="Platform"
+                >
+                  <ToggleButton value="list">
+                    <ViewListIcon />
+                  </ToggleButton>
+                  <ToggleButton value="grid">
+                    <GridViewIcon />
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              </Stack>
+            ) : null}
+            {viewMode === "list" ? (
+              <NFTListingTable
+                listings={filteredListings}
+                tokens={filteredListings.map((el: any) => el.token)}
+                collections={collections}
+                columns={["timestamp", "price", "discount"]}
+              />
+            ) : null}
+            {viewMode === "grid" ? (
+              <div className="items-center flex flex-col sm:grid md:grid-cols-2 lg:grid-cols-3 sm:w-fit gap-4 sm:gap-2 md:gap-3">
+                {filteredListings
+                  .slice(0, showing)
+                  .map((el: NFTIndexerListingI) => {
+                    const pk = `${el.mpContractId}-${el.mpListingId}`;
+                    const listedToken = {
+                      ...el.token,
+                      metadataURI: stripTrailingZeroBytes(el.token.metadataURI),
+                    };
+                    return (
+                      <Grid2 key={pk}>
+                        <CartNftCard
+                          token={listedToken}
+                          listing={el}
+                          onClick={() => {
+                            navigate(
+                              `/collection/${el.token.contractId}/token/${el.token.tokenId}`
+                            );
+                          }}
+                        />
+                      </Grid2>
+                    );
+                  })}
+                {showing < sortedListings.length && (
+                  <Grid2>
+                    <div
+                      onClick={() => setShowing(showing + 50)}
+                      className={`${
+                        isDarkTheme ? "button-dark" : "button-light"
+                      } cursor-pointer`}
                     >
-                      View More
-                    </Button>
-                  </div>
-                </Grid2>
-              )}
-            </div>
+                      <Button
+                        className={
+                          isDarkTheme ? "button-text-dark" : "button-text-light"
+                        }
+                      >
+                        View More
+                      </Button>
+                    </div>
+                  </Grid2>
+                )}
+              </div>
+            ) : null}
           </ListingContainer>
         </ListingRoot>
       </Layout>
-      <Layout>
-        {!isLoading ? (
-          <div>
-            <BannerContainer
-              style={{
-                backgroundImage: `url(${displayCoverImage})`,
-                backgroundPosition: "center",
-                backgroundSize: "cover",
-              }}
-            >
-              <BannerTitleContainer>
-                <BannerTitle>{displayCollectionName}</BannerTitle>
-              </BannerTitleContainer>
-            </BannerContainer>
-            <Grid container spacing={2}>
-              {/*<Grid
+      {false && (
+        <Layout>
+          {!isLoading ? (
+            <div>
+              <BannerContainer
+                style={{
+                  backgroundImage: `url(${displayCoverImage})`,
+                  backgroundPosition: "center",
+                  backgroundSize: "cover",
+                }}
+              >
+                <BannerTitleContainer>
+                  <BannerTitle>{displayCollectionName}</BannerTitle>
+                </BannerTitleContainer>
+              </BannerContainer>
+              <Stack direction="row" spacing={2} sx={{ justifyContent: "end" }}>
+                <ToggleButtonGroup
+                  color="primary"
+                  value={viewMode}
+                  exclusive
+                  onChange={() => {
+                    setViewMode(viewMode === "list" ? "grid" : "list");
+                  }}
+                  aria-label="Platform"
+                >
+                  <ToggleButton value="list">
+                    <ViewListIcon />
+                  </ToggleButton>
+                  <ToggleButton value="grid">
+                    <GridViewIcon />
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              </Stack>
+              <Grid container spacing={2}>
+                {/*<Grid
               item
               sx={{ display: { xs: "none", sm: "block" } }}
               xs={12}
@@ -1247,19 +1321,19 @@ export const Collection: React.FC = () => {
               &nbsp;
             </Grid>
             */}
-              <Grid item xs={12} sm={12}>
-                <Stack sx={{ mt: 5 }} gap={2}>
-                  <StatContainer
-                    sx={{
-                      //display: { xs: "none", md: "flex" },
-                      flexDirection: { xs: "column", md: "row" },
-                      overflow: "hidden",
-                      justifyContent: "flex-end",
-                      gap: "40px",
-                    }}
-                  >
-                    {[
-                      /*
+                <Grid item xs={12} sm={12}>
+                  <Stack sx={{ mt: 5 }} gap={2}>
+                    <StatContainer
+                      sx={{
+                        //display: { xs: "none", md: "flex" },
+                        flexDirection: { xs: "column", md: "row" },
+                        overflow: "hidden",
+                        justifyContent: "flex-end",
+                        gap: "40px",
+                      }}
+                    >
+                      {[
+                        /*
                     {
                       name: "Total NFTs",
                       displayValue: nfts.length,
@@ -1304,138 +1378,130 @@ export const Collection: React.FC = () => {
                           : 0,
                     },
                     */
-                    ].map((el, i) =>
-                      el.value > 0 ? (
-                        <Stack
-                          sx={{
-                            flexShrink: 0,
-                          }}
-                          key={i}
-                        >
-                          <Typography sx={{ color: "#717579" }} variant="h6">
-                            {el.name}
-                          </Typography>
-                          <Typography
-                            variant="h4"
-                            className={isDarkTheme ? "dark" : "light"}
+                      ].map((el, i) =>
+                        el.value > 0 ? (
+                          <Stack
+                            sx={{
+                              flexShrink: 0,
+                            }}
+                            key={i}
                           >
-                            {el.displayValue}
-                          </Typography>
-                        </Stack>
-                      ) : null
-                    )}
-                  </StatContainer>
-                  {accounts.length > 0 && id === "421076" ? (
-                    <Box>
-                      <Button
-                        size="large"
-                        variant="contained"
+                            <Typography sx={{ color: "#717579" }} variant="h6">
+                              {el.name}
+                            </Typography>
+                            <Typography
+                              variant="h4"
+                              className={isDarkTheme ? "dark" : "light"}
+                            >
+                              {el.displayValue}
+                            </Typography>
+                          </Stack>
+                        ) : null
+                      )}
+                    </StatContainer>
+
+                    <Stack
+                      direction="row"
+                      spacing={2}
+                      sx={{ justifyContent: "end" }}
+                    >
+                      <ToggleButtonGroup
                         color="primary"
-                        onClick={() => {
-                          setIsMintModalVisible(true);
+                        value={viewMode}
+                        exclusive
+                        onChange={() => {
+                          setViewMode(viewMode === "list" ? "grid" : "list");
                         }}
+                        aria-label="Platform"
                       >
-                        Mint
-                      </Button>
-                    </Box>
-                  ) : null}
-                  {/*<Stack
-                  direction="row"
-                  spacing={2}
-                  sx={{ justifyContent: "end" }}
-                >
-                  <ToggleButtonGroup
-                    color="primary"
-                    value={viewMode}
-                    exclusive
-                    onChange={() => {
-                      setViewMode(viewMode === "list" ? "grid" : "list");
-                    }}
-                    aria-label="Platform"
-                  >
-                    <ToggleButton value="list">
-                      <ViewListIcon />
-                    </ToggleButton>
-                    <ToggleButton value="grid">
-                      <GridViewIcon />
-                    </ToggleButton>
-                  </ToggleButtonGroup>
-                  </Stack>*/}
-                  {/*viewMode === "list" ? (
-                  <NFTListingTable
-                    listings={normalListings}
-                    tokens={nfts}
-                    collections={collections}
-                  />
-                ) : null*/}
-                  {viewMode === "grid" ? (
-                    sortedListings?.length > 0 ? (
-                      <>
-                        <Grid2 container spacing={2}>
-                          {sortedListings?.map((el: NFTIndexerListingI) => {
-                            return (
-                              <Grid2 key={el.transactionId}>
-                                <CartNftCard
-                                  token={{
-                                    ...el.token,
-                                    metadataURI: stripTrailingZeroBytes(
-                                      el.token.metadataURI
-                                    ),
-                                  }}
-                                  listing={el}
-                                  onClick={() => {
-                                    navigate(
-                                      `/collection/${el.collectionId}/token/${el.tokenId}`
-                                    );
-                                  }}
-                                />
-                              </Grid2>
-                            );
-                          })}
-                        </Grid2>
-                      </>
-                    ) : (
-                      <Box sx={{ mt: 5 }}>
-                        <Typography variant="body2">
-                          No NFTs found in this collection
-                        </Typography>
-                      </Box>
-                    )
-                  ) : null}
-                </Stack>
+                        <ToggleButton value="list">
+                          <ViewListIcon />
+                        </ToggleButton>
+                        <ToggleButton value="grid">
+                          <GridViewIcon />
+                        </ToggleButton>
+                      </ToggleButtonGroup>
+                    </Stack>
+                    {viewMode === "list" ? (
+                      <NFTListingTable
+                        listings={normalListings}
+                        tokens={nfts}
+                        collections={collections}
+                      />
+                    ) : null}
+                    {viewMode === "grid" ? (
+                      sortedListings?.length > 0 ? (
+                        <>
+                          <Grid2 container spacing={2}>
+                            {sortedListings?.map((el: NFTIndexerListingI) => {
+                              return (
+                                <Grid2 key={el.transactionId}>
+                                  <CartNftCard
+                                    token={{
+                                      ...el.token,
+                                      metadataURI: stripTrailingZeroBytes(
+                                        el.token.metadataURI
+                                      ),
+                                    }}
+                                    listing={el}
+                                    onClick={() => {
+                                      navigate(
+                                        `/collection/${el.collectionId}/token/${el.tokenId}`
+                                      );
+                                    }}
+                                  />
+                                </Grid2>
+                              );
+                            })}
+                          </Grid2>
+                        </>
+                      ) : (
+                        <Box sx={{ mt: 5 }}>
+                          <Typography variant="body2">
+                            No NFTs found in this collection
+                          </Typography>
+                        </Box>
+                      )
+                    ) : null}
+                  </Stack>
+                </Grid>
               </Grid>
-            </Grid>
-          </div>
-        ) : (
-          <Container maxWidth="lg">
-            <Stack sx={{ mt: 5 }} gap={2}>
-              <Skeleton variant="text" width={280} height={50} />
-              <Grid container spacing={2}>
-                {[1, 2, 3, 4, 5, 6].map((el) => (
-                  <Grid item xs={6} sm={4} md={3} lg={2}>
-                    <Skeleton variant="rectangular" width="100%" height={200} />
-                  </Grid>
-                ))}
-              </Grid>
-              <Skeleton variant="text" width={280} height={50} />
-              <Skeleton variant="text" width={180} height={50} />
-              <Skeleton variant="text" width={180} height={50} />
-            </Stack>
-          </Container>
-        )}
-        {id === "421076" ? (
-          <MintModal
-            collectionId={Number(id)}
-            title="Mint Nautilus Voi Staking NFT"
-            handleClose={() => {
-              setIsMintModalVisible(false);
-            }}
-            open={isMintModalVisible}
-            accounts={accounts}
-            buttonText="Mint"
-          />
-        ) : null}
-      </Layout>
+            </div>
+          ) : (
+            <Container maxWidth="lg">
+              <Stack sx={{ mt: 5 }} gap={2}>
+                <Skeleton variant="text" width={280} height={50} />
+                <Grid container spacing={2}>
+                  {[1, 2, 3, 4, 5, 6].map((el) => (
+                    <Grid item xs={6} sm={4} md={3} lg={2}>
+                      <Skeleton
+                        variant="rectangular"
+                        width="100%"
+                        height={200}
+                      />
+                    </Grid>
+                  ))}
+                </Grid>
+                <Skeleton variant="text" width={280} height={50} />
+                <Skeleton variant="text" width={180} height={50} />
+                <Skeleton variant="text" width={180} height={50} />
+              </Stack>
+            </Container>
+          )}
+        </Layout>
+      )}
+      {id === "421076" ? (
+        <MintModal
+          collectionId={Number(id)}
+          title="Mint Nautilus Voi Staking NFT"
+          handleClose={() => {
+            setIsMintModalVisible(false);
+          }}
+          open={isMintModalVisible}
+          accounts={accounts}
+          buttonText="Mint"
+        />
+      ) : null}
     </>
   );
 };

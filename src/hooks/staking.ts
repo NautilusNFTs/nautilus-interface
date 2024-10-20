@@ -12,6 +12,7 @@ export const addRewardEstimates = (accounts: any[]) => {
     const isStaking = account.global_period_limit > 5;
     return {
       ...account,
+      type: isStaking ? "Staking" : "Airdrop",
       global_initial:
         reward?.initial ||
         account.global_initial ||
@@ -20,6 +21,22 @@ export const addRewardEstimates = (accounts: any[]) => {
       global_total: reward?.total || account?.global_total || 0,
     };
   });
+};
+
+export const useOwnedStakingContract = (owner: string) => {
+  const data = useQuery({
+    queryFn: () => {
+      return axios
+        .get(`${INDEXER_API}/v1/scs/accounts`, {
+          params: {
+            owner,
+          },
+        })
+        .then(({ data: { accounts } }) => addRewardEstimates(accounts));
+    },
+    queryKey: ["stakingAccount", owner],
+  });
+  return data;
 };
 
 export const useStakingContract = (contractId: number) => {

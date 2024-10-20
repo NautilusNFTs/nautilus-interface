@@ -38,19 +38,6 @@ import { getAlgorandClients } from "@/wallets";
 import { abi, CONTRACT } from "ulujs";
 import algosdk from "algosdk";
 
-const names = [
-  "Oliver Hansen",
-  "Van Henry",
-  "April Tucker",
-  "Ralph Hubbard",
-  "Omar Alexander",
-  "Carlos Abbott",
-  "Miriam Wagner",
-  "Bradley Wilkerson",
-  "Virginia Andrews",
-  "Kelly Snyder",
-];
-
 interface MultipleSelectNativeProps {
   options: any[];
   onChange: (newValue: any) => void;
@@ -324,7 +311,7 @@ const MintModal: React.FC<MintModalProps> = ({
                           <TableCell>Total Tokens</TableCell>
                           <TableCell align="right">
                             {el.global_period > 5
-                              ? formatter.format(el.global_total / 10 ** 6)
+                              ? formatter.format(el.global_total)
                               : formatter.format(el.global_total)}{" "}
                             VOI
                           </TableCell>
@@ -352,6 +339,7 @@ const MintModal: React.FC<MintModalProps> = ({
             </Grid>
             <Stack sx={{ mt: 3 }} gap={2}>
               <Button
+                disabled={contractId === ""}
                 size="large"
                 fullWidth
                 variant="contained"

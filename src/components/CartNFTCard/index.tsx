@@ -389,6 +389,7 @@ const CartNftCard: React.FC<NFTCardProps> = ({
       toast.info(e.message);
     }
   };
+  
   const handleCartIconClick = async (pool: any, discount: any) => {
     if (!activeAccount || !listing) {
       toast.info("Please connect wallet!");
