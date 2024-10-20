@@ -387,6 +387,9 @@ export const Account: React.FC = () => {
 
       for (let i = 0; i < selectedNfts.length; i++) {
         const nft = selectedNfts[i];
+        const metadata = JSON.parse(nft.metadata);
+        const royalties = decodeRoyalties(metadata.royalties);
+        console.log({ nft, metadata, royalties });
         const whichMP206 = CTCINFO_MP206;
         // [nautilusVoiStaking].includes(nft.contractId)
         //   ? CTCINFO_MP206_2
@@ -402,7 +405,7 @@ export const Account: React.FC = () => {
             paymentTokenId,
             wrappedNetworkTokenId: TOKEN_WVOI,
             extraTxns: [],
-            enforceRoyalties: false,
+            enforceRoyalties: true,
             mpContractId: whichMP206,
             listingBoxPaymentOverride: ListingBoxCost + i,
             skipEnsure: true,
@@ -472,12 +475,9 @@ export const Account: React.FC = () => {
       const paymentTokenId =
         token.contractId === 0 ? Number(token.tokenId) : token.contractId;
 
-      console.log(nft, nft.listing);
-
       const buildN: any[][] = [];
 
-      for (const skipEnsure of [true, false]) {
-        console.log({ skipEnsure });
+      for (const skipEnsure of [false, true]) {
         const customR = await mp.list(
           activeAccount.address,
           {
@@ -493,7 +493,7 @@ export const Account: React.FC = () => {
             paymentTokenId,
             wrappedNetworkTokenId: TOKEN_WVOI,
             extraTxns: [],
-            enforceRoyalties: false,
+            enforceRoyalties: true,
             mpContractId: CTCINFO_MP206,
             listingBoxPaymentOverride: ListingBoxCost,
             listingsToDelete: nft.listing ? [nft.listing] : [],
@@ -751,7 +751,6 @@ export const Account: React.FC = () => {
           }
         }
         for await (const nft of chunk) {
-          console.log({ nft });
           const ci = new arc72(nft.contractId, algodClient, indexerClient, {
             acc: { addr: activeAccount?.address || "", sk: new Uint8Array(0) },
           });
@@ -816,7 +815,6 @@ export const Account: React.FC = () => {
           abi.custom,
           { addr: activeAccount?.address || "", sk: new Uint8Array(0) }
         );
-        console.log({ buildN });
         ciCustom.setExtraTxns(buildN);
         // ------------------------------------------
         // Add payment if necessary

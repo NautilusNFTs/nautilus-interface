@@ -57,9 +57,7 @@ const StakingInformation: FC<StakingInformationProps> = ({ contractId }) => {
       <Typography variant="body2">
         <strong>Est. Total Tokens:</strong>
         {` `}
-        {stakingAccountData[0].global_period > 5
-          ? `${stakingAccountData[0].global_total / 10 ** 6} VOI`
-          : `${formatter.format(stakingAccountData[0].global_total)} VOI`}
+        {stakingAccountData[0].total || stakingAccountData[0].global_total} VOI
       </Typography>
     </Box>
   ) : (

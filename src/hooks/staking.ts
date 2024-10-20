@@ -17,9 +17,7 @@ export const addRewardEstimates = (accounts: any[]) => {
         account.global_initial ||
         account?.global_initial ||
         0,
-      global_total: !isStaking
-        ? reward?.total || account?.global_total || 0
-        : reward?.total || account?.global_total || 0,
+      global_total: reward?.total || account?.global_total || 0,
     };
   });
 };
