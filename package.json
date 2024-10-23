@@ -46,6 +46,7 @@
     "clsx": "^2.1.1",
     "dexie": "^3.2.7",
     "dexie-react-hooks": "^1.1.7",
+    "humanize-duration": "^3.32.1",
     "lucide-react": "^0.441.0",
     "lute-connect": "^1.4.1",
     "moment": "^2.30.1",

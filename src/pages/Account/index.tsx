@@ -56,7 +56,7 @@ import { QUEST_ACTION, getActions, submitAction } from "../../config/quest";
 import { BigNumber } from "bignumber.js";
 import { getSmartTokens } from "../../store/smartTokenSlice";
 import ListBatchModal from "../../components/modals/ListBatchModal";
-import { TOKEN_WVOI } from "../../contants/tokens";
+import { TOKEN_NAUT_VOI_STAKING, TOKEN_WVOI } from "../../contants/tokens";
 import {
   useListings,
   usePrices,
@@ -381,8 +381,6 @@ export const Account: React.FC = () => {
             }
           : token;
 
-      const nautilusVoiStaking = 421076;
-
       console.log({ selectedNfts });
 
       for (let i = 0; i < selectedNfts.length; i++) {
@@ -405,7 +403,11 @@ export const Account: React.FC = () => {
             paymentTokenId,
             wrappedNetworkTokenId: TOKEN_WVOI,
             extraTxns: [],
-            enforceRoyalties: true,
+            enforceRoyalties: [TOKEN_NAUT_VOI_STAKING].includes(
+              nft?.listing?.collectionId || 0
+            )
+              ? false
+              : true,
             mpContractId: whichMP206,
             listingBoxPaymentOverride: ListingBoxCost + i,
             skipEnsure: true,
@@ -493,7 +495,11 @@ export const Account: React.FC = () => {
             paymentTokenId,
             wrappedNetworkTokenId: TOKEN_WVOI,
             extraTxns: [],
-            enforceRoyalties: true,
+            enforceRoyalties: [nautilusVoiStaking].includes(
+              nft?.listing?.collectionId || 0
+            )
+              ? false
+              : true,
             mpContractId: CTCINFO_MP206,
             listingBoxPaymentOverride: ListingBoxCost,
             listingsToDelete: nft.listing ? [nft.listing] : [],
@@ -895,6 +901,102 @@ export const Account: React.FC = () => {
       setOpenTransferBatch(false);
       setSelected([]);
     }
+  };
+
+  const handleWithdrawStaking = async () => {
+    if (!activeAccount) return;
+    const apid = Number(nfts[selected[0]].tokenId);
+    const apid2 = Number(nfts[selected[0]].contractId);
+    const owner = algosdk.getApplicationAddress(apid2);
+    const { amount, ["min-balance"]: minBalance } = await algodClient
+      .accountInformation(algosdk.getApplicationAddress(apid))
+      .do();
+    const availableBalance = amount - Number(minBalance);
+    const ci = new CONTRACT(
+      apid,
+      algodClient,
+      indexerClient,
+      {
+        name: "AirdropClient",
+        methods: [
+          {
+            name: "withdraw",
+            args: [
+              {
+                type: "uint64",
+                name: "amount",
+              },
+            ],
+            readonly: false,
+            returns: {
+              type: "uint64",
+            },
+            desc: "Withdraw funds from contract.",
+          },
+        ],
+        events: [],
+      },
+      {
+        addr: owner,
+        sk: new Uint8Array(0),
+      }
+    );
+    ci.setFee(3000);
+    const withdrawR = await ci.withdraw(0);
+    if (!withdrawR.success) {
+      throw new Error("withdraw failed in simulate");
+    }
+    const withdraw = withdrawR.returnValue;
+    const withdrawableBalance = BigInt(availableBalance) - BigInt(withdraw);
+    if (withdrawableBalance === BigInt(0)) {
+      toast.info("No funds to withdraw");
+      return;
+    }
+    const ci2 = new CONTRACT(
+      apid2,
+      algodClient,
+      indexerClient,
+      {
+        name: "NautilusVoiStaking",
+        methods: [
+          {
+            name: "withdraw",
+            args: [
+              {
+                type: "uint64",
+                name: "tokenId",
+              },
+              {
+                type: "uint64",
+                name: "amount",
+              },
+            ],
+            readonly: false,
+            returns: {
+              type: "void",
+            },
+            desc: "Withdraw funds from contract.",
+          },
+        ],
+        events: [],
+      },
+      {
+        addr: activeAccount.address,
+        sk: new Uint8Array(0),
+      }
+    );
+    ci2.setFee(5000);
+    const withdrawR2 = await ci2.withdraw(apid, Number(withdrawableBalance));
+    console.log({ withdrawR2 });
+    if (!withdrawR2.success) {
+      throw new Error("withdraw failed in simulate");
+    }
+    const stxns = await signTransactions(
+      withdrawR2.txns.map(
+        (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
+      )
+    );
+    await algodClient.sendRawTransaction(stxns as Uint8Array[]).do();
   };
 
   const handleBurnStaking = async () => {
@@ -1379,7 +1481,13 @@ export const Account: React.FC = () => {
                       </Button>
                     ) : null}
                     {selected.length === 1 &&
-                    nfts[selected[0]].contractId === 421076 ? (
+                    nfts[selected[0]].contractId === TOKEN_NAUT_VOI_STAKING ? (
+                      <Button onClick={handleWithdrawStaking}>
+                        Withdraw Block Rewards
+                      </Button>
+                    ) : null}
+                    {selected.length === 1 &&
+                    nfts[selected[0]].contractId === TOKEN_NAUT_VOI_STAKING ? (
                       <Button onClick={handleBurnStaking}>
                         Burn Staking NFT{` `}
                         <Tooltip

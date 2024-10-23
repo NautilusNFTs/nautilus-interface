@@ -25,7 +25,7 @@ import BigNumber from "bignumber.js";
 import { useSelector } from "react-redux";
 import { formatter } from "../../../utils/number";
 import CartNftCard from "../../CartNFTCard";
-import { TOKEN_WVOI } from "../../../contants/tokens";
+import { TOKEN_NAUT_VOI_STAKING, TOKEN_WVOI } from "../../../contants/tokens";
 import { useSmartTokens } from "@/components/Navbar/hooks/collections";
 import StakingInformation from "@/components/StakingInformation/StakingInformation";
 import { decode } from "punycode";
@@ -251,7 +251,11 @@ const ListBatchModal: React.FC<ListBatchModalProps> = ({
                 <CostBreakdown
                   price={Number(price)}
                   marketplaceFeeRate={mpFee}
-                  royaltyFeeRate={royaltyFee}
+                  royaltyFeeRate={
+                    [TOKEN_NAUT_VOI_STAKING].includes(nfts[0].contractId)
+                      ? 0
+                      : royaltyFee
+                  }
                   symbol="VOI"
                 />
               )}

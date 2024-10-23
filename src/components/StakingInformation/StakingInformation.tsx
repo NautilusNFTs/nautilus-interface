@@ -4,6 +4,7 @@ import { Box, Typography } from "@mui/material";
 import { formatter } from "@/utils/number";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
+import humanizeDuration from "humanize-duration";
 
 interface StakingInformationProps {
   contractId: number;
@@ -36,15 +37,29 @@ const StakingInformation: FC<StakingInformationProps> = ({ contractId }) => {
       </Typography>
       <Typography variant="body2">
         <strong>Lockup:</strong>{" "}
-        {stakingAccountData[0].global_period_limit > 5
-          ? `${stakingAccountData[0].global_period + 1} mo`
-          : `${stakingAccountData[0].global_period} years`}
+        {humanizeDuration(
+          stakingAccountData[0].global_period *
+            stakingAccountData[0].global_period_seconds *
+            1000,
+          {
+            largest: 2,
+            round: true,
+            units: ["mo"],
+          }
+        )}
       </Typography>
       <Typography variant="body2">
         <strong>Vesting:</strong>{" "}
-        {stakingAccountData[0].global_period > 5
-          ? `${stakingAccountData[0].global_distribution_count} mo`
-          : `12 years`}
+        {humanizeDuration(
+          stakingAccountData[0].global_distribution_count *
+            stakingAccountData[0].global_distribution_seconds *
+            1000,
+          {
+            largest: 2,
+            round: true,
+            units: ["mo"],
+          }
+        )}
       </Typography>
       <Typography variant="body2">
         <strong>Stake Amount:</strong>{" "}
@@ -57,7 +72,23 @@ const StakingInformation: FC<StakingInformationProps> = ({ contractId }) => {
       <Typography variant="body2">
         <strong>Est. Total Tokens:</strong>
         {` `}
-        {stakingAccountData[0].total || stakingAccountData[0].global_total} VOI
+        {formatter.format(
+          stakingAccountData[0].total || stakingAccountData[0].global_total
+        )}{" "}
+        VOI
+      </Typography>
+      <Typography variant="body2">
+        <strong>Delegate:</strong>
+        {` `}
+        <a
+          style={{ color: "#93F" }}
+          target="_blank"
+          rel="noreferrer"
+          href={`https://explorer.voi.network/explorer/account/${stakingAccountData[0].global_delegate}`}
+        >
+          {stakingAccountData[0].global_delegate.slice(0, 10)}...
+          {stakingAccountData[0].global_delegate.slice(-10)}
+        </a>
       </Typography>
     </Box>
   ) : (

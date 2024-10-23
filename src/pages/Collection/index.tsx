@@ -52,6 +52,8 @@ import { useDebounceCallback } from "usehooks-ts";
 import CollectionSelect from "@/components/CollectionSelect";
 import DiamondIcon from "@mui/icons-material/Diamond";
 import { useMarketplaceListings } from "@/hooks/mp";
+import TollIcon from "@mui/icons-material/Toll";
+import NorthEastIcon from "@mui/icons-material/NorthEast";
 
 const PriceRangeContainer = styled.div`
   display: flex;
@@ -242,7 +244,9 @@ const SidebarFilterRoot = styled(Stack)`
 `;
 
 const ListingContainer = styled.div`
+  /*
   padding-top: 16px;
+*/
   overflow: hidden;
   flex-grow: 1;
 `;
@@ -570,25 +574,6 @@ export const Collection: React.FC = () => {
   const debouncedSearch = useDebounceCallback(setSearch, 500);
   const debouncedMin = useDebounceCallback(setMin, 500);
   const debouncedMax = useDebounceCallback(setMax, 500);
-
-  /* NFT Navigator Listings */
-  // const [listings, setListings] = React.useState<any>([]);
-  // React.useEffect(() => {
-  //   try {
-  //     const res = axios
-  //       .get(`${ARC72_INDEXER_API}/nft-indexer/v1/mp/listings`, {
-  //         params: {
-  //           active: true,
-  //           collectionId: id,
-  //         },
-  //       })
-  //       .then(({ data }) => {
-  //         setListings(data.listings);
-  //       });
-  //   } catch (e) {
-  //     console.log(e);
-  //   }
-  // }, []);
 
   const { data: listings, isLoading: collectionListingsLoading } =
     useMarketplaceListings(Number(id));
@@ -1179,9 +1164,26 @@ export const Collection: React.FC = () => {
           </BannerTitleContainer>
         </BannerContainer>
         <ListingRoot className="!flex !flex-col lg:!flex-row !items-center md:!items-start">
-          {viewMode !== "list" ? (
-            <div className="!hidden sm:!block">
-              <Stack gap={5} sx={{ mt: 3 }}>
+          {/*<div className="sm:!hidden w-full">
+            <DialogSearch>{renderSidebar}</DialogSearch>
+          </div>*/}
+          <ListingContainer>
+            {id === "421076" ? (
+              <Stack direction="row" spacing={2} sx={{ justifyContent: "end" }}>
+                {/*<div className="hidden lg:block">
+                  <DialogSearch>{renderSidebar}</DialogSearch>
+                </div>*/}
+                <Button
+                  size="large"
+                  variant="text"
+                  color="primary"
+                  onClick={() => {
+                    window.open("https://staking.voi.network/", "_blank");
+                  }}
+                >
+                  Stake
+                  <NorthEastIcon />
+                </Button>
                 {accounts.length > 0 && id === "421076" ? (
                   <Button
                     size="large"
@@ -1191,20 +1193,10 @@ export const Collection: React.FC = () => {
                       setIsMintModalVisible(true);
                     }}
                   >
+                    <TollIcon />
                     Mint
                   </Button>
                 ) : null}
-
-                {renderSidebar}
-              </Stack>
-            </div>
-          ) : null}
-          <div className="sm:!hidden w-full">
-            <DialogSearch>{renderSidebar}</DialogSearch>
-          </div>
-          <ListingContainer>
-            {id === "421076" ? (
-              <Stack direction="row" spacing={2} sx={{ justifyContent: "end" }}>
                 <ToggleButtonGroup
                   color="primary"
                   value={viewMode}
@@ -1224,56 +1216,64 @@ export const Collection: React.FC = () => {
               </Stack>
             ) : null}
             {viewMode === "list" ? (
-              <NFTListingTable
-                listings={filteredListings}
-                tokens={filteredListings.map((el: any) => el.token)}
-                collections={collections}
-                columns={["timestamp", "price", "discount"]}
-              />
+              <Box sx={{ mt: 3 }}>
+                <NFTListingTable
+                  listings={filteredListings}
+                  tokens={filteredListings.map((el: any) => el.token)}
+                  collections={collections}
+                  columns={["timestamp", "price", "discount"]}
+                />
+              </Box>
             ) : null}
             {viewMode === "grid" ? (
-              <div className="items-center flex flex-col sm:grid md:grid-cols-2 lg:grid-cols-3 sm:w-fit gap-4 sm:gap-2 md:gap-3">
-                {filteredListings
-                  .slice(0, showing)
-                  .map((el: NFTIndexerListingI) => {
-                    const pk = `${el.mpContractId}-${el.mpListingId}`;
-                    const listedToken = {
-                      ...el.token,
-                      metadataURI: stripTrailingZeroBytes(el.token.metadataURI),
-                    };
-                    return (
-                      <Grid2 key={pk}>
-                        <CartNftCard
-                          token={listedToken}
-                          listing={el}
-                          onClick={() => {
-                            navigate(
-                              `/collection/${el.token.contractId}/token/${el.token.tokenId}`
-                            );
-                          }}
-                        />
-                      </Grid2>
-                    );
-                  })}
-                {showing < sortedListings.length && (
-                  <Grid2>
-                    <div
-                      onClick={() => setShowing(showing + 50)}
-                      className={`${
-                        isDarkTheme ? "button-dark" : "button-light"
-                      } cursor-pointer`}
-                    >
-                      <Button
-                        className={
-                          isDarkTheme ? "button-text-dark" : "button-text-light"
-                        }
+              <Box sx={{ mt: 3 }}>
+                <div className="items-center flex flex-col sm:grid md:grid-cols-2 lg:grid-cols-4 sm:w-fit gap-4 sm:gap-2 md:gap-3">
+                  {filteredListings
+                    .slice(0, showing)
+                    .map((el: NFTIndexerListingI) => {
+                      const pk = `${el.mpContractId}-${el.mpListingId}`;
+                      const listedToken = {
+                        ...el.token,
+                        metadataURI: stripTrailingZeroBytes(
+                          el.token.metadataURI
+                        ),
+                      };
+                      return (
+                        <Grid2 key={pk}>
+                          <CartNftCard
+                            token={listedToken}
+                            listing={el}
+                            onClick={() => {
+                              navigate(
+                                `/collection/${el.token.contractId}/token/${el.token.tokenId}`
+                              );
+                            }}
+                          />
+                        </Grid2>
+                      );
+                    })}
+                  {showing < sortedListings.length && (
+                    <Grid2>
+                      <div
+                        onClick={() => setShowing(showing + 50)}
+                        className={`${
+                          isDarkTheme ? "button-dark" : "button-light"
+                        } cursor-pointer`}
                       >
-                        View More
-                      </Button>
-                    </div>
-                  </Grid2>
-                )}
-              </div>
+                        <Button
+                          className={
+                            isDarkTheme
+                              ? "button-text-dark"
+                              : "button-text-light"
+                          }
+                        >
+                          View More
+                        </Button>
+                      </div>
+                    </Grid2>
+                  )}
+                </div>
+              </Box>
             ) : null}
           </ListingContainer>
         </ListingRoot>

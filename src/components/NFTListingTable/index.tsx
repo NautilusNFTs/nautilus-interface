@@ -40,6 +40,7 @@ import { mp, swap } from "ulujs";
 import BuySaleModal, { multiplier } from "../modals/BuySaleModal";
 import algosdk from "algosdk";
 import { TOKEN_WVOI } from "@/contants/tokens";
+import { stakingRewards } from "@/static/staking/staking";
 
 const StyledImage = styled(Box)`
   width: 53px;
@@ -89,17 +90,14 @@ const StyledTableRow = mstyled(TableRow)(({ theme }) => {
   };
 });
 
-interface Props {
-  listings: ListingI[];
-  tokens: Token[];
-  collections: CollectionI[];
-  limit?: number;
-  columns?: string[];
-  selected?: string;
-  onSelect?: (index: string) => void;
-  exchangeRate?: number;
-  enableSelect?: boolean;
-}
+const computeListingDiscount = (listing: ListingI) => {
+  if (!listing.rewards || !listing) return 0;
+  const { rewards } = listing;
+  ((Number(rewards.total || listing.staking.global_total) -
+    Number(listing.price / 1e6)) /
+    Number(rewards.total || listing.staking.global_total)) *
+    100;
+};
 
 interface NFTListingTableRowProps {
   listing: ListingI;
@@ -110,10 +108,13 @@ const NFTListingTableRow: React.FC<NFTListingTableRowProps> = ({ listing }) => {
   const metadata = JSON.parse(token.metadata || "{}");
   const { activeAccount, signTransactions } = useWallet();
   const [isBuying, setIsBuying] = useState(false);
+
   const { data: stakingContractData, isLoading: loadingStakingContractData } =
     useStakingContract(listing.token?.tokenId || 0);
+
   const smartTokens = useSelector((state: any) => state.smartTokens.tokens);
   const [openBuyModal, setOpenBuyModal] = React.useState(false);
+
   const handleCartIconClick = async (pool: any, discount: any) => {
     if (!activeAccount || !listing) {
       toast.info("Please connect wallet!");
@@ -332,6 +333,18 @@ const NFTListingTableRow: React.FC<NFTListingTableRowProps> = ({ listing }) => {
   );
 };
 
+interface Props {
+  listings: ListingI[];
+  tokens: Token[];
+  collections: CollectionI[];
+  limit?: number;
+  columns?: string[];
+  selected?: string;
+  onSelect?: (index: string) => void;
+  exchangeRate?: number;
+  enableSelect?: boolean;
+}
+
 const NFTListingTable: React.FC<Props> = ({
   tokens,
   collections,
@@ -344,6 +357,8 @@ const NFTListingTable: React.FC<Props> = ({
 }) => {
   const { isDarkTheme } = useSelector((state: RootState) => state.theme);
   type SortOption =
+    | "discount-asc"
+    | "discount-dsc"
     | "price-asc"
     | "price-dsc"
     | "timestamp-asc"
@@ -352,7 +367,7 @@ const NFTListingTable: React.FC<Props> = ({
     | "token-dsc"
     | "seller-asc"
     | "seller-dsc";
-  const [sortBy, setSortBy] = useState<SortOption>("timestamp-dsc");
+  const [sortBy, setSortBy] = useState<SortOption>("discount-dsc");
 
   const isLoading = !listings || !collections || !tokens;
 
@@ -370,7 +385,12 @@ const NFTListingTable: React.FC<Props> = ({
         (token) =>
           token.tokenId === b.tokenId && token.contractId === b.collectionId
       ) || ({} as Token);
-    if (sortBy === "token-asc") {
+    if (sortBy === "discount-asc") {
+      return b.staking.discount - a.staking.discount;
+    }
+    if (sortBy === "discount-dsc") {
+      return b.staking.discount - b.staking.discount;
+    } else if (sortBy === "token-asc") {
       return tokenA.metadata?.name?.localeCompare(tokenB.metadata?.name);
     } else if (sortBy === "token-dsc") {
       return tokenB.metadata?.name.localeCompare(tokenA.metadata?.name);
@@ -550,19 +570,19 @@ const NFTListingTable: React.FC<Props> = ({
                   <Box>Discount</Box>
                   <img
                     src={
-                      ["seller-asc", "seller-dsc"].includes(sortBy)
-                        ? sortBy === "seller-asc"
+                      ["discount-asc", "discount-dsc"].includes(sortBy)
+                        ? sortBy === "discount-asc"
                           ? UpIcon
                           : DownIcon
                         : SelectorIcon
                     }
                     onClick={() => {
                       setSortBy(
-                        ["seller-asc", "seller-dsc"].includes(sortBy)
-                          ? sortBy === "seller-asc"
-                            ? "seller-dsc"
-                            : "seller-asc"
-                          : "seller-dsc"
+                        ["discount-asc", "discount-dsc"].includes(sortBy)
+                          ? sortBy === "discount-asc"
+                            ? "discount-dsc"
+                            : "discount-asc"
+                          : "discount-dsc"
                       );
                     }}
                     alt="selector"

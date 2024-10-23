@@ -113,6 +113,9 @@ export interface ListingI {
   transactionId: string;
   createTimestamp: number;
   token?: Token;
+  discount?: number;
+  staking?: any;
+  rewards?: any;
 }
 
 export interface ListingActivityI extends ListingI {

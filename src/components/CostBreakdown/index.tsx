@@ -47,18 +47,20 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
             {marketplaceFee.toFixed(2)} {symbol}
           </Typography>
         </Grid>
-
-        <Grid item xs={6}>
-          <Typography variant="body1" color="textSecondary">
-            Royalty Fee ({(royaltyFeeRate * 100).toFixed(2)}%):
-          </Typography>
-        </Grid>
-        <Grid item xs={6}>
-          <Typography variant="body1" align="right">
-            {royaltyFee.toFixed(2)} {symbol}
-          </Typography>
-        </Grid>
-
+        {royaltyFee > 0 ? (
+          <>
+            <Grid item xs={6}>
+              <Typography variant="body1" color="textSecondary">
+                Royalty Fee ({(royaltyFeeRate * 100).toFixed(2)}%):
+              </Typography>
+            </Grid>
+            <Grid item xs={6}>
+              <Typography variant="body1" align="right">
+                {royaltyFee.toFixed(2)} {symbol}
+              </Typography>
+            </Grid>
+          </>
+        ) : null}
         <Grid item xs={6}>
           <Typography variant="body1" color="textSecondary">
             Proceeds:
