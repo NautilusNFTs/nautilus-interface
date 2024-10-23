@@ -67,7 +67,6 @@ const NFTCollectionTable: React.FC<Props> = ({ rankings, collectionInfo }) => {
         <TableBody>
           {rankings.map((player, index) => {
             const ranking = player;
-            console.log({ ranking });
             const collection = collectionInfo?.find(
               (el) => `${el.applicationID}` === `${ranking.collectionId}`
             );
