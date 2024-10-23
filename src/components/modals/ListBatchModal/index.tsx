@@ -28,7 +28,6 @@ import CartNftCard from "../../CartNFTCard";
 import { TOKEN_NAUT_VOI_STAKING, TOKEN_WVOI } from "../../../contants/tokens";
 import { useSmartTokens } from "@/components/Navbar/hooks/collections";
 import StakingInformation from "@/components/StakingInformation/StakingInformation";
-import { decode } from "punycode";
 import { decodeRoyalties } from "@/utils/hf";
 import CostBreakdown from "@/components/CostBreakdown";
 import { mp } from "ulujs";
