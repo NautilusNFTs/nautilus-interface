@@ -13,8 +13,6 @@ import { Box } from "@mui/material";
 import { RankingI } from "../../types";
 import { Link } from "react-router-dom";
 
-const formatter = Intl.NumberFormat("en", { notation: "compact" });
-
 const StyledImage = styled(Box)`
   width: 53px;
   height: 53px;
@@ -22,6 +20,10 @@ const StyledImage = styled(Box)`
   border-radius: 8px;
   background-size: cover;
 `;
+
+interface Props {
+  rankings: RankingI[];
+}
 
 const StyledTableCell = mstyled(TableCell)(({ theme }) => {
   const isDarkTheme = useSelector(
@@ -34,16 +36,11 @@ const StyledTableCell = mstyled(TableCell)(({ theme }) => {
   };
 });
 
-interface Props {
-  rankings: RankingI[];
-  collectionInfo: any[];
-}
-
-const NFTCollectionTable: React.FC<Props> = ({ rankings, collectionInfo }) => {
+const NFTCollectionTable: React.FC<Props> = ({ rankings }) => {
   return (
     <TableContainer>
       <Table aria-label="rankings table">
-        <TableHead className="border-b">
+        <TableHead>
           <TableRow>
             {[
               "#",
@@ -53,64 +50,48 @@ const NFTCollectionTable: React.FC<Props> = ({ rankings, collectionInfo }) => {
               //"Floor Change",
               "Volume",
               //"Volume Change",
-              "Listings",
-              "Sales",
               "Items",
               "Owners",
             ].map((header, index) => (
-              <StyledTableCell className=" " key={index}>
-                {header}
-              </StyledTableCell>
+              <StyledTableCell key={index}>{header}</StyledTableCell>
             ))}
           </TableRow>
         </TableHead>
         <TableBody>
-          {rankings.map((player, index) => {
-            const ranking = player;
-            const collection = collectionInfo?.find(
-              (el) => `${el.applicationID}` === `${ranking.collectionId}`
-            );
-            const collectionName =
-              collection?.title || ranking?.name || "Collection Name";
-            return (
-              <TableRow key={index}>
-                <StyledTableCell component="th" scope="row">
-                  {index + 1}
-                </StyledTableCell>
-                <StyledTableCell>
-                  <StyledImage
-                    sx={{ backgroundImage: `url(${player.image})` }}
-                  />
-                </StyledTableCell>
-                <StyledTableCell>
-                  <Link
-                    style={{ textDecoration: "none", color: "inherit" }}
-                    to={`/collection/${player.collectionId}`}
-                  >
-                    {collectionName}
-                  </Link>
-                </StyledTableCell>
-                <StyledTableCell>
-                  {player.floorPrice === 0
-                    ? "-"
-                    : player.floorPrice.toLocaleString() + " VOI"}
-                </StyledTableCell>
-                <StyledTableCell>
-                  {player.volume === 0
-                    ? "-"
-                    : player.volume.toLocaleString() + " VOI"}
-                </StyledTableCell>
-                <StyledTableCell>{player.listings}</StyledTableCell>
-                <StyledTableCell>{player.sales}</StyledTableCell>
-                <StyledTableCell>
-                  {player.items === 0 ? "-" : player.items}
-                </StyledTableCell>
-                <StyledTableCell>
-                  {player.owners === 0 ? "-" : player.owners}
-                </StyledTableCell>
-              </TableRow>
-            );
-          })}
+          {rankings.map((player, index) => (
+            <TableRow key={index}>
+              <StyledTableCell component="th" scope="row">
+                {index + 1}
+              </StyledTableCell>
+              <StyledTableCell>
+                <StyledImage sx={{ backgroundImage: `url(${player.image})` }} />
+              </StyledTableCell>
+              <StyledTableCell>
+                <Link
+                  style={{ textDecoration: "none", color: "inherit" }}
+                  to={`/collection/${player.collectionId}`}
+                >
+                  {player.name}
+                </Link>
+              </StyledTableCell>
+              <StyledTableCell>
+                {player.floorPrice === 0
+                  ? "-"
+                  : (Number(player.floorPrice) / 1e6).toLocaleString() + " VOI"}
+              </StyledTableCell>
+              <StyledTableCell>
+                {player.volume === 0
+                  ? "-"
+                  : (Number(player.volume) / 1e6).toLocaleString() + " VOI"}
+              </StyledTableCell>
+              <StyledTableCell>
+                {player.items === 0 ? "-" : player.items}
+              </StyledTableCell>
+              <StyledTableCell>
+                {player.owners === 0 ? "-" : player.owners}
+              </StyledTableCell>
+            </TableRow>
+          ))}
         </TableBody>
       </Table>
     </TableContainer>

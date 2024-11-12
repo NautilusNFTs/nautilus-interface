@@ -6,7 +6,6 @@ import { RootState } from "../../store/store";
 import styled from "styled-components";
 import { decodePrice, decodeTokenId } from "../../utils/mp";
 import NftCard from "../../components/NFTCard";
-import { HIGHFORGE_CDN } from "@/config/arc72-idx";
 
 const StyledLink = styled(Link)`
   text-decoration: none;
@@ -63,8 +62,6 @@ export const NFTMore: React.FC<NFTMoreProps> = ({ nfts, title, onClick }) => {
 
   const isLoading = false;
 
-  console.log({ nfts });
-
   return !isLoading && nfts.length > 0 ? (
     <Stack style={{ gap: "36px" }}>
       <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -81,7 +78,9 @@ export const NFTMore: React.FC<NFTMoreProps> = ({ nfts, title, onClick }) => {
         {nfts.slice(0, 4).map((el: any) => {
           const collectionsMissingImage = [35720076];
           const url = !collectionsMissingImage.includes(el.contractId)
-            ? `${HIGHFORGE_CDN}/i/${encodeURIComponent(el.metadataURI)}?w=400`
+            ? `https://prod.cdn.highforge.io/i/${encodeURIComponent(
+                el.metadataURI
+              )}?w=400`
             : el.metadata.image;
           return (
             <Grid key={`${el.tokenId}`} item xs={6} sm={4} md={3}>

@@ -3,7 +3,7 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 import db from "../db";
 import { RootState } from "./store";
-import { NFTIndexerTokenI, Token } from "../types";
+import { NFTIndexerToken, Token } from "../types";
 import { decodeRoyalties } from "../utils/hf";
 import { ARC72_INDEXER_API } from "../config/arc72-idx";
 
@@ -12,26 +12,6 @@ export interface TokensState {
   status: "idle" | "loading" | "succeeded" | "failed";
   error: string | null;
 }
-
-export const getToken = async (contractId: number, tokenId: number) => {
-  const token = await db.table("tokens").get(`${contractId}-${tokenId}`);
-  if (token) return token;
-  const response = await axios.get(
-    `${ARC72_INDEXER_API}/nft-indexer/v1/tokens/${contractId}/${tokenId}`
-  );
-  const newToken = response.data;
-  await db.table("tokens").put({
-    pk: `${newToken.contractId}-${newToken.tokenId}`,
-    owner: newToken.owner,
-    approved: newToken.approved,
-    tokenId: newToken.tokenId,
-    contractId: newToken.contractId,
-    mintRound: newToken["mint-round"],
-    metadataURI: newToken?.metadataURI || "",
-    metadata: newToken?.metadata,
-  });
-  return newToken;
-};
 
 export const getTokens = createAsyncThunk<
   Token[],
@@ -54,10 +34,10 @@ export const getTokens = createAsyncThunk<
       }
     );
     const newTokens = response.data.tokens.filter(
-      (token: NFTIndexerTokenI) => token["mint-round"] > lastRound
+      (token: NFTIndexerToken) => token["mint-round"] > lastRound
     );
     await db.table("tokens").bulkPut(
-      newTokens.map((token: NFTIndexerTokenI) => {
+      newTokens.map((token: NFTIndexerToken) => {
         return {
           pk: `${token.contractId}-${token.tokenId}`,
           owner: token.owner,

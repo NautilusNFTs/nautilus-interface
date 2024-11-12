@@ -35,9 +35,9 @@ const PaymentCurrencyRadio: React.FC<PaymentCurrencyRadioProps> = ({
         value={selectedValue}
         onChange={handleChange}
       >
-        {currencies.map((currency,key) => (
+        {currencies.map((currency) => (
           <FormControlLabel
-            key={`${currency.value}_${key}`}
+            key={currency.value}
             value={currency.value}
             control={<Radio disabled={disabled} />}
             label={currency.label}

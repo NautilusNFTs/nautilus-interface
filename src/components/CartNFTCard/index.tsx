@@ -1,34 +1,18 @@
-import React, { useEffect, useMemo } from "react";
+import React from "react";
 import styled from "styled-components";
-import { Avatar, Badge, Box, Chip, Fade, Stack, Tooltip } from "@mui/material";
+import { Avatar, Box, Stack, Tooltip } from "@mui/material";
 import { stringToColorCode } from "../../utils/string";
 import VoiIcon from "../../static/crypto-icons/voi/0.svg";
 import ViaIcon from "../../static/crypto-icons/voi/6779767.svg";
-import {
-  ListedToken,
-  ListingTokenI,
-  NFTIndexerListingI,
-  NFTIndexerTokenI,
-  TokenType,
-} from "../../types";
+import { ListedToken } from "../../types";
 import { useNavigate } from "react-router-dom";
-import BuySaleModal, { multiplier } from "../modals/BuySaleModal";
+import BuySaleModal from "../modals/BuySaleModal";
 import { toast } from "react-toastify";
+import { useWallet } from "@txnlab/use-wallet";
 import algosdk from "algosdk";
 import { getAlgorandClients } from "../../wallets";
-import { CONTRACT, abi, mp, swap } from "ulujs";
-import { BigNumber } from "bignumber.js";
-import { QUEST_ACTION, getActions, submitAction } from "../../config/quest";
-import CurrencyExchangeIcon from "@mui/icons-material/CurrencyExchange";
-import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
-import { uluClient } from "../../utils/contract";
-import { zeroAddress } from "../../contants/accounts";
-import { TOKEN_WVOI } from "../../contants/tokens";
-import { useSelector } from "react-redux";
-import { useWallet } from "@txnlab/use-wallet-react";
-import { HIGHFORGE_CDN } from "@/config/arc72-idx";
-
-const formatter = Intl.NumberFormat("en", { notation: "compact" });
+import { CONTRACT, arc200 } from "ulujs";
+import { ctcInfoMp206 } from "../../contants/mp";
 
 const CollectionName = styled.div`
   color: var(--White, #fff);
@@ -64,6 +48,8 @@ const NFTCardWrapper = styled.div`
   flex-direction: column;
   position: relative;
   transition: all 0.1s ease;
+  //height: 481px;
+  //width: 305px;
   overflow: hidden;
   cursor: pointer;
   &:hover {
@@ -71,6 +57,7 @@ const NFTCardWrapper = styled.div`
   }
   & .image {
     align-self: stretch;
+    //height: 305px;
     position: relative;
     width: 100%;
     height: 200px;
@@ -246,55 +233,358 @@ const NFTCardWrapper = styled.div`
 `;
 
 interface NFTCardProps {
-  token: ListingTokenI | NFTIndexerTokenI;
-  listing?: NFTIndexerListingI;
-  onClick?: () => void;
-  selected?: boolean;
-  size?: "small" | "medium" | "large";
-  imageOnly?: boolean;
+  listedNft: ListedToken;
 }
 
-const CartNftCard: React.FC<NFTCardProps> = ({
-  imageOnly = false,
-  size = "medium",
-  token,
-  listing,
-  onClick,
-  selected,
-}) => {
-  const { activeAccount, signTransactions } = useWallet();
-
-  const metadata = JSON.parse(token.metadata || "{}");
-
+const CartNftCard: React.FC<NFTCardProps> = ({ listedNft: el }) => {
   const navigate = useNavigate();
-
-  const [display, setDisplay] = React.useState(true);
-
+  const { activeAccount, signTransactions, sendTransactions } = useWallet();
   const [isBuying, setIsBuying] = React.useState(false);
   const [openBuyModal, setOpenBuyModal] = React.useState(false);
 
-  const smartTokens = useSelector((state: any) => state.smartTokens.tokens);
+  // handleBuy
+  const handleBuy = async () => {
+    try {
+      if (!activeAccount) {
+        throw new Error("Please connect wallet!");
+      }
+      setIsBuying(true);
 
-  const currency = smartTokens.find(
-    (token: any) => `${token.contractId}` === `${listing?.currency}`
-  );
+      const { algodClient, indexerClient } = getAlgorandClients();
 
-  const currencyDecimals =
-    currency?.decimals === 0 ? 0 : currency?.decimals || 6;
-  const currencySymbol =
-    currency?.tokenId === "0" ? "VOI" : currency?.symbol || "VOI";
+      // -----------------------------------------
+      // check if collection might need a payment to transfer
+      // -----------------------------------------
+      const collectionAddr = algosdk.getApplicationAddress(el.contractId);
+      const collectionAccountInfo = await algodClient
+        .accountInformation(collectionAddr)
+        .do();
+      const { amount, ["min-balance"]: minBalance } = collectionAccountInfo;
+      const availableBalance = amount - minBalance;
+      const boxCost = 28500;
+      const addBoxPayment = availableBalance < boxCost;
+      console.log({ availableBalance, boxCost, addBoxPayment });
+      if (addBoxPayment) {
+        const paymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+          from: activeAccount.address,
+          to: collectionAddr,
+          amount: 28500,
+          suggestedParams: await algodClient.getTransactionParams().do(),
+        });
+        await toast.promise(
+          signTransactions([paymentTxn.toByte()]).then(sendTransactions),
+          {
+            pending: `Transaction signature pending... ${((str) =>
+              str[0].toUpperCase() + str.slice(1))(
+              activeAccount.providerId
+            )} will prompt you to sign the transaction.`,
+            success: "Transaction successful!",
+            error: "Transaction failed",
+          }
+        );
+      }
+      // -----------------------------------------
 
-  const priceBn = new BigNumber(listing?.price || 0).div(
-    new BigNumber(10).pow(currencyDecimals)
-  );
+      switch (`${el.listing.currency}`) {
+        case "0": {
+          const builder = {
+            mp: new CONTRACT(
+              ctcInfoMp206,
+              algodClient,
+              indexerClient,
+              {
+                name: "",
+                desc: "",
+                methods: [
+                  {
+                    name: "a_sale_buyNet",
+                    args: [
+                      {
+                        name: "listId",
+                        type: "uint256",
+                      },
+                    ],
+                    returns: {
+                      type: "void",
+                    },
+                  },
+                ],
+                events: [],
+              },
+              { addr: activeAccount?.address || "", sk: new Uint8Array(0) },
+              undefined,
+              undefined,
+              true
+            ),
+          };
 
-  const price = formatter.format(priceBn.toNumber());
+          const customTxn = (
+            await Promise.all([
+              builder.mp.a_sale_buyNet(el.listing.mpListingId),
+            ])
+          ).map(({ obj }) => obj);
 
-  const priceNormal = useMemo(() => {
-    if (!currency || !currency.price) return 0;
-    const price = priceBn.multipliedBy(new BigNumber(currency.price));
-    return formatter.format(price.toNumber());
-  }, [currency, priceBn]);
+          const ci = new CONTRACT(
+            ctcInfoMp206,
+            algodClient,
+            indexerClient,
+            {
+              name: "",
+              desc: "",
+              methods: [
+                {
+                  name: "custom",
+                  args: [],
+                  returns: {
+                    type: "void",
+                  },
+                },
+              ],
+              events: [],
+            },
+            {
+              addr: activeAccount?.address || "",
+              sk: new Uint8Array(0),
+            }
+          );
+          ci.setExtraTxns(customTxn);
+          ci.setFee(10000);
+          ci.setPaymentAmount(el.listing.price);
+          ci.setEnableGroupResourceSharing(true);
+
+          const customR = await ci.custom();
+          if (!customR.success) {
+            throw new Error("Listing no longer available");
+          }
+
+          await toast.promise(
+            signTransactions(
+              customR.txns.map(
+                (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
+              )
+            ).then(sendTransactions),
+            {
+              pending: `Transaction signature pending... ${((str) =>
+                str[0].toUpperCase() + str.slice(1))(
+                activeAccount.providerId
+              )} will prompt you to sign the transaction.`,
+              success: "Transaction successful!",
+              error: "Transaction failed",
+            }
+          );
+
+          break;
+        }
+        default: {
+          // -----------------------------------------
+          // conditional approval to mp addr
+          // -----------------------------------------
+          const mpAddr = algosdk.getApplicationAddress(ctcInfoMp206);
+          const ptid = Number(el.listing.currency);
+          const ciArc200 = new arc200(ptid, algodClient, indexerClient);
+          const hasAllowanceR = await ciArc200.hasAllowance(
+            activeAccount.address,
+            mpAddr
+          );
+          const arc200_allowanceR = await ciArc200.arc200_allowance(
+            activeAccount.address,
+            mpAddr
+          );
+          console.log({ hasAllowanceR, arc200_allowanceR });
+          if (!hasAllowanceR.success) {
+            throw new Error("Failed to check allowance");
+          }
+          const hasAllowance = hasAllowanceR.returnValue;
+          console.log({ hasAllowance });
+          if (hasAllowance === 0) {
+            const ci = new CONTRACT(
+              ptid,
+              algodClient,
+              indexerClient,
+              {
+                name: "",
+                desc: "",
+                methods: [
+                  {
+                    name: "arc200_approve",
+                    desc: "Approve spender for a token",
+                    args: [{ type: "address" }, { type: "uint256" }],
+                    returns: { type: "bool", desc: "Success" },
+                  },
+                ],
+                events: [],
+              },
+              { addr: activeAccount?.address || "", sk: new Uint8Array(0) }
+            );
+            ci.setPaymentAmount(28100);
+            const arc200_approveR = await ci.arc200_approve(
+              algosdk.getApplicationAddress(ctcInfoMp206),
+              0
+            );
+            if (!arc200_approveR.success) {
+              throw new Error("Failed to approve spender");
+            }
+
+            await toast.promise(
+              signTransactions(
+                arc200_approveR.txns.map(
+                  (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
+                )
+              ).then(sendTransactions),
+              {
+                pending: `Transaction signature pending... ${((str) =>
+                  str[0].toUpperCase() + str.slice(1))(
+                  activeAccount.providerId
+                )} will prompt you to sign the transaction.`,
+                success: "Transaction successful!",
+                error: "Transaction failed",
+              }
+            );
+
+            // -----------------------------------------
+          }
+
+          const builder = {
+            mp: new CONTRACT(
+              ctcInfoMp206,
+              algodClient,
+              indexerClient,
+              {
+                name: "",
+                desc: "",
+                methods: [
+                  {
+                    name: "a_sale_buySC",
+                    args: [
+                      {
+                        name: "listId",
+                        type: "uint256",
+                      },
+                    ],
+                    returns: {
+                      type: "void",
+                    },
+                  },
+                ],
+                events: [],
+              },
+              { addr: activeAccount?.address || "", sk: new Uint8Array(0) },
+              undefined,
+              undefined,
+              true
+            ),
+            arc200: new CONTRACT(
+              ptid,
+              algodClient,
+              indexerClient,
+              {
+                name: "",
+                desc: "",
+                methods: [
+                  {
+                    name: "arc200_approve",
+                    desc: "Approve spender for a token",
+                    args: [{ type: "address" }, { type: "uint256" }],
+                    returns: { type: "bool", desc: "Success" },
+                  },
+                  {
+                    name: "arc200_transfer",
+                    desc: "Transfers tokens",
+                    args: [
+                      {
+                        type: "address",
+                      },
+                      {
+                        type: "uint256",
+                      },
+                    ],
+                    returns: { type: "bool" },
+                  },
+                ],
+                events: [],
+              },
+              { addr: activeAccount?.address || "", sk: new Uint8Array(0) },
+              undefined,
+              undefined,
+              true
+            ),
+          };
+          const ci = new CONTRACT(
+            //ptid,
+            ctcInfoMp206,
+            algodClient,
+            indexerClient,
+            {
+              name: "",
+              desc: "",
+              methods: [
+                {
+                  name: "custom",
+                  args: [],
+                  returns: {
+                    type: "void",
+                  },
+                },
+              ],
+              events: [],
+            },
+            {
+              addr: activeAccount?.address || "",
+              sk: new Uint8Array(0),
+            }
+          );
+
+          const customTxn = (
+            await Promise.all([
+              builder.arc200.arc200_approve(
+                algosdk.getApplicationAddress(ctcInfoMp206),
+                el.listing.price
+              ),
+              builder.mp.a_sale_buySC(el.listing.mpListingId),
+            ])
+          ).map(({ obj }) => obj);
+
+          ci.setPaymentAmount(28500);
+          ci.setAccounts([
+            "VIAGCPULN6FUTHUNPQZDRQIHBT7IUVT264B3XDXLZNX7OZCJP6MEF7JFQU", // tokenAddr
+          ]);
+          ci.setExtraTxns(customTxn);
+          ci.setFee(13000);
+          ci.setEnableGroupResourceSharing(true);
+          ci.setBeaconId(ctcInfoMp206);
+          const customR = await ci.custom();
+          if (!customR.success) {
+            throw new Error("Listing no longer available");
+          }
+
+          await toast.promise(
+            signTransactions(
+              customR.txns.map(
+                (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
+              )
+            ).then(sendTransactions),
+            {
+              pending: `Transaction signature pending... ${((str) =>
+                str[0].toUpperCase() + str.slice(1))(
+                activeAccount.providerId
+              )} will prompt you to sign the transaction.`,
+              success: "Transaction successful!",
+              error: "Transaction failed",
+            }
+          );
+
+          break;
+        }
+      }
+      toast.success("NFT purchase successful!");
+    } catch (e: any) {
+      console.log(e);
+      toast.error(e.message);
+    } finally {
+      setIsBuying(false);
+      setOpenBuyModal(false);
+    }
+  };
 
   const handleBuyButtonClick = async () => {
     try {
@@ -304,7 +594,7 @@ const CartNftCard: React.FC<NFTCardProps> = ({
       }
       const { algodClient, indexerClient } = getAlgorandClients();
       const ci = new CONTRACT(
-        listing?.mpContractId || 0,
+        el.listing.mpContractId,
         algodClient,
         indexerClient,
         {
@@ -330,7 +620,7 @@ const CartNftCard: React.FC<NFTCardProps> = ({
         { addr: activeAccount.address, sk: new Uint8Array(0) }
       );
       const v_sale_listingByIndexR = await ci.v_sale_listingByIndex(
-        listing?.mpListingId || 0
+        el.listing.mpListingId
       );
       if (!v_sale_listingByIndexR.success) {
         throw new Error("Failed to get listing");
@@ -339,8 +629,8 @@ const CartNftCard: React.FC<NFTCardProps> = ({
       if (v_sale_listingByIndex[1] === BigInt(0)) {
         throw new Error("Listing no longer available");
       }
-      switch (listing?.currency || 0) {
-        /*
+
+      switch (el.listing.currency) {
         // VOI
         case 0: {
           const accountInfo = await algodClient
@@ -348,10 +638,10 @@ const CartNftCard: React.FC<NFTCardProps> = ({
             .do();
           const { amount, ["min-balance"]: minBalance } = accountInfo;
           const availableBalance = amount - minBalance;
-          if (availableBalance < el.price) {
+          if (availableBalance < el.listing.price) {
             throw new Error(
               `Insufficient balance! (${(
-                (availableBalance - el.price) /
+                (availableBalance - el.listing.price) /
                 1e6
               ).toLocaleString()} VOI)`
             );
@@ -360,7 +650,11 @@ const CartNftCard: React.FC<NFTCardProps> = ({
         }
         // VIA
         case 6779767: {
-          const ci = new arc200(el.currency, algodClient, indexerClient);
+          const ci = new arc200(
+            el.listing.currency,
+            algodClient,
+            indexerClient
+          );
           const arc200_balanceOfR = await ci.arc200_balanceOf(
             activeAccount.address
           );
@@ -368,19 +662,18 @@ const CartNftCard: React.FC<NFTCardProps> = ({
             throw new Error("Failed to check balance");
           }
           const arc200_balanceOf = arc200_balanceOfR.returnValue;
-          if (arc200_balanceOf < el.price) {
+          if (arc200_balanceOf < el.listing.price) {
             throw new Error(
               `Insufficient balance! (${(
-                (Number(arc200_balanceOf) - el.price) /
+                (Number(arc200_balanceOf) - el.listing.price) /
                 1e6
               ).toLocaleString()}) VIA`
             );
           }
           break;
         }
-        */
         default: {
-          //throw new Error("Unsupported currency!");
+          throw new Error("Unsupported currency!");
         }
       }
       setOpenBuyModal(true);
@@ -389,252 +682,73 @@ const CartNftCard: React.FC<NFTCardProps> = ({
       toast.info(e.message);
     }
   };
-  
-  const handleCartIconClick = async (pool: any, discount: any) => {
-    if (!activeAccount || !listing) {
-      toast.info("Please connect wallet!");
-      return;
-    }
-    try {
-      setIsBuying(true);
-      // -------------------------------------
-      // SIM HERE
-      // -------------------------------------
-      const { algodClient, indexerClient } = getAlgorandClients();
-      let customR;
-      for (const skipEnsure of [true, false]) {
-        if (pool) {
-          const {
-            contractId: poolId,
-            tokAId,
-            tokBId,
-            poolBalA,
-            poolBalB,
-          } = pool;
-          // -------------------------------------
-          const tokA: TokenType = smartTokens.find(
-            (el: any) => `${el.contractId}` === tokAId
-          );
-          const tokB: TokenType = smartTokens.find(
-            (el: any) => `${el.contractId}` === tokBId
-          );
-          const inToken = tokA?.tokenId === "0" ? tokA : tokB;
-          const outToken = tokA?.tokenId !== "0" ? tokA : tokB;
-          const ratio =
-            inToken === tokA
-              ? new BigNumber(poolBalA).div(poolBalB).toNumber()
-              : new BigNumber(poolBalB).div(poolBalA).toNumber();
-          // figure out how much to swap
-          const swapR: any = await new swap(
-            poolId,
-            algodClient,
-            indexerClient
-          ).swap(
-            activeAccount.address,
-            poolId,
-            {
-              amount: new BigNumber(ratio)
-                .times(priceBn.minus(new BigNumber(discount || 0)))
-                .times(multiplier)
-                .toFixed(6),
-              contractId: inToken?.contractId,
-              tokenId: "0",
-              symbol: "VOI",
-            },
-            {
-              contractId: outToken?.contractId,
-              symbol: outToken?.symbol,
-              decimals: `${outToken?.decimals}`,
-            }
-          );
-          if (!swapR.success) throw new Error("swap failed");
-          const returnValue = swapR.response.txnGroups[0].txnResults
-            .slice(-1)[0]
-            .txnResult.logs.slice(-1)[0];
-
-          const selector = returnValue.slice(0, 4).toString("hex");
-          const outA = algosdk.bytesToBigInt(returnValue.slice(4, 36));
-          const outB = algosdk.bytesToBigInt(returnValue.slice(36, 68));
-
-          customR = await mp.buy(activeAccount.address, listing, currency, {
-            paymentTokenId:
-              listing.currency === 0 ? TOKEN_WVOI : listing.currency,
-            wrappedNetworkTokenId: TOKEN_WVOI,
-            extraTxns: swapR.objs,
-            algodClient,
-            indexerClient,
-            skipEnsure,
-          });
-        } else {
-          // no pool
-          const paymentToken = smartTokens.find(
-            (el: any) => `${el.contractId}` === `${listing.currency}`
-          );
-          customR = await mp.buy(activeAccount.address, listing, paymentToken, {
-            paymentTokenId:
-              listing.currency === 0 ? TOKEN_WVOI : listing.currency,
-            wrappedNetworkTokenId: TOKEN_WVOI,
-            extraTxns: [],
-            algodClient,
-            indexerClient,
-            skipEnsure,
-          });
-        }
-        if (customR.success) break;
-      }
-      console.log({ customR });
-      if (!customR.success) throw new Error("custom failed at end"); // abort
-      // -------------------------------------
-      // SIGM HERE
-      // -------------------------------------
-      const stxn = await signTransactions(
-        customR.txns.map(
-          (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
-        )
-      );
-      await algodClient.sendRawTransaction(stxn as Uint8Array[]).do();
-      // -------------------------------------
-      // QUEST HERE buy
-      // -------------------------------------
-      // do {
-      //   const address = activeAccount.address;
-      //   const actions: string[] = [QUEST_ACTION.SALE_BUY_ONCE];
-      //   const {
-      //     data: { results },
-      //   } = await getActions(address);
-      //   for (const action of actions) {
-      //     const address = activeAccount.address;
-      //     const key = `${action}:${address}`;
-      //     const completedAction = results.find((el: any) => el.key === key);
-      //     if (!completedAction) {
-      //       const { collectionId: contractId, tokenId } = listing;
-      //       await submitAction(action, address, {
-      //         contractId,
-      //         tokenId,
-      //       });
-      //     }
-      //     // TODO notify quest completion here
-      //   }
-      // } while (0);
-      // -------------------------------------
-      toast.success("Purchase successful!");
-    } catch (e: any) {
-      console.log(e);
-      toast.error(e.message);
-    } finally {
-      setIsBuying(false);
-      setOpenBuyModal(false);
-    }
-  };
   const collectionsMissingImage = [35720076];
-  const url = !collectionsMissingImage.includes(Number(token.contractId))
-    ? `${HIGHFORGE_CDN}/i/${encodeURIComponent(token.metadataURI)}?w=400`
-    : metadata.image;
-
-  const displayName = (metadata.name || "").match(/[0-9]/)
-    ? metadata.name
-    : `${metadata.name} #${token.tokenId}`;
-
-  return display ? (
-    <Box
-      style={{
-        border: `4px solid ${selected ? "green" : "transparent"}`,
-        borderRadius: "25px",
-      }}
-    >
+  const url = !collectionsMissingImage.includes(el.contractId)
+    ? `https://prod.cdn.highforge.io/i/${encodeURIComponent(
+        el.metadataURI
+      )}?w=400`
+    : el.metadata.image;
+  return (
+    <>
       <Box
         style={{
           cursor: "pointer",
-          width: size === "medium" ? "305px" : "100px",
-          height: size === "medium" ? "305px" : "100px",
+          width: "384px",
+          height: "384px",
           flexShrink: 0,
           borderRadius: "20px",
-          background: `linear-gradient(0deg, rgba(0, 0, 0, 0.50) 10.68%, rgba(0, 0, 0, 0.00) 46.61%), 
-            url(${url}), 
-            lightgray 50% / cover no-repeat`,
+          background: `linear-gradient(0deg, rgba(0, 0, 0, 0.50) 10.68%, rgba(0, 0, 0, 0.00) 46.61%), url(${url}), lightgray 50% / cover no-repeat`,
           backgroundSize: "cover",
           display: "flex",
           alignItems: "flex-end",
           justifyContent: "center",
         }}
-        onClick={
-          onClick
-          /*
-          (e) => {
-          navigate(`/collection/${token.contractId}/token/${token.tokenId}`);
-        }*/
-        }
+        onClick={(e) => {
+          navigate(`/collection/${el.contractId}/token/${el.tokenId}`);
+        }}
       >
-        {!imageOnly ? (
-          <Stack
-            direction="row"
-            spacing={2}
-            sx={{
-              alignItems: "center",
-              justifyContent: "space-between",
-              color: "#fff",
-              width: "90%",
-              height: "52px",
-              marginBottom: "27px",
-            }}
-          >
-            <Stack gap={1}>
-              <CollectionName>{displayName}</CollectionName>
-              <CollectionVolume>
-                {price !== "0" ? (
-                  <Stack direction="row" gap={1} sx={{ alignItems: "center" }}>
-                    <span>
-                      {`${priceNormal || price} ${
-                        priceNormal ? "VOI" : currencySymbol
-                      }`}
-                    </span>
-                    {priceNormal && currencySymbol !== "VOI" ? (
-                      <Chip
-                        sx={{ background: "#fff" }}
-                        label={`${price} ${currencySymbol}`}
-                      />
-                    ) : null}
-                  </Stack>
-                ) : null}
-              </CollectionVolume>
-            </Stack>
-            {price !== "0" ? (
-              <img
-                style={{ zIndex: 2 }}
-                height="40"
-                width="40"
-                src="/static/icon-cart.png"
-                onClick={(e) => {
-                  e.stopPropagation(); // Prevents the outer onClick handler from triggering
-                  e.preventDefault();
-                  handleBuyButtonClick();
-                }}
-              />
-            ) : null}
+        <Stack
+          direction="row"
+          spacing={2}
+          sx={{
+            alignItems: "center",
+            justifyContent: "space-between",
+            color: "#fff",
+            width: "326px",
+            height: "52px",
+            marginBottom: "27px",
+          }}
+        >
+          <Stack gap={1}>
+            <CollectionName>{el.metadata.name}</CollectionName>
+            <CollectionVolume>
+              {Math.round(el.listing.price / 1e6).toLocaleString()}{" "}
+              {el.listing.currency === 0 ? "VOI" : "VIA"}
+            </CollectionVolume>
           </Stack>
-        ) : null}
+          <img
+            height="40"
+            width="40"
+            src="/static/icon-cart.png"
+            onClick={(e) => {
+              //handleBuyButtonClick();
+            }}
+          />
+        </Stack>
       </Box>
-      {activeAccount && openBuyModal && listing ? (
-        <BuySaleModal
-          token={token}
-          listing={listing}
-          seller={listing.seller}
-          open={openBuyModal}
-          loading={isBuying}
-          handleClose={() => setOpenBuyModal(false)}
-          onSave={handleCartIconClick}
-          title="Buy NFT"
-          buttonText="Buy"
-          image={metadata.image}
-          price={price}
-          priceNormal={priceNormal || ""}
-          priceAU={listing.price.toString()}
-          currency={currencySymbol}
-          paymentTokenId={listing.currency}
-        />
-      ) : null}
-    </Box>
-  ) : null;
+      <BuySaleModal
+        open={false}
+        loading={false}
+        handleClose={() => {}}
+        onSave={async () => {}}
+        title="Buy NFT"
+        buttonText="Buy"
+        image={el.metadata.image}
+        price={(el.listing.price / 1e6).toLocaleString()}
+        currency={el.listing.currency === 0 ? "VOI" : "VIA"}
+      />
+    </>
+  );
 };
 
 export default CartNftCard;
