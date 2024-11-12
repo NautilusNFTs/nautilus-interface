@@ -4,17 +4,31 @@ import LightLogo from "../../static/logo-light.svg";
 import DarkLogo from "../../static/logo-dark.svg";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
-import { Box, Grid, Stack, Typography } from "@mui/material";
+import { Grid, Stack, TextField, Button, useMediaQuery, useTheme } from "@mui/material";
 import { Link } from "react-router-dom";
-import { currentVersion, deploymentVersion } from "@/contants/versions";
 
 const FooterRoot = styled.footer`
   position: absolute;
-  /* padding: 64px 80px; */
+  padding: 64px 80px;
   border-top: 1px solid #eaebf0; /* Border color set to #EAEBF0 */
   padding-bottom: 80px;
   padding-right: 0px;
-  /* padding-left: 80px; */
+  padding-left: 80px;
+`;
+
+const FooterContainer = styled.div`
+  width: 1280px; /* Fill (1,280px) */
+  height: fit-content; /* Hug (412px) */
+  gap: 64px;
+  display: flex;
+  flex-direction: column;
+`;
+
+const HorizontalContainer = styled.div`
+  width: 1280px; /* Fill (1,280px) */
+  height: fit-content; /* Hug (292px) */
+  display: flex;
+  justify-content: space-between; /* Justify: space-between */
 `;
 
 const Container = styled.div`
@@ -55,19 +69,19 @@ const Copyright = styled.div`
   line-height: 24px;
   letter-spacing: 0px;
   text-align: center;
+  width: 303px;
   height: 24px;
   color: #68727d;
 `;
 
 const FooterLink = styled.li`
   font-family: Inter;
-  font-size: 14px;
-  font-weight: 300;
-  line-height: 20px;
-  letter-spacing: 0.10000000149011612px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
   text-align: left;
   color: #68727d;
-  margin-top: 12px;
+  margin-top: 15px;
 `;
 
 const FooterList = styled.ul`
@@ -81,7 +95,34 @@ const SocialContainer = styled.div`
   align-items: flex-start;
   gap: 16px;
   align-self: stretch;
+  margin-top: 20px;
 `;
+
+const SubmitContainer = styled.div`
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  align-self: stretch;
+`;
+
+const EmailInput = styled.input`
+  flex-grow: 1;
+  border: 1px solid #EAEBF0;
+  border-radius: 6px 0px 0px 6px;
+  padding: 12px 16px 12px 16px;
+`
+
+const EmailSubmit = styled.button`
+  width: 90px;
+  border: none;
+  border-radius: 0px 6px 6px 0px;
+  padding: 12px 16px 12px 16px;
+  background: #9933FF;
+  font-family: Inter;
+  font-size: 14px;
+  font-style: normal;
+  color: white;
+`
 
 const SocialHeading = styled.div`
   color: #161717;
@@ -132,33 +173,60 @@ const DiscordIcon = () => {
   );
 };
 
+const RedditIcon = () => {
+  return (
+    <svg 
+      width="33" 
+      height="30" 
+      viewBox="0 0 33 30" 
+      fill="none" 
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M19.3453 0C17.8414 0 16.0836 1.18025 15.8185 6.45089C16.0417 6.44531 16.2622 6.42857 16.4882 6.42857C16.7393 6.42857 16.9988 6.44252 17.2471 6.45089C17.4173 3.28404 18.1707 1.42857 19.3453 1.42857C19.8476 1.42857 20.1322 1.70201 20.6623 2.27679C21.2817 2.94922 22.0909 3.82255 23.6757 4.15179C23.6506 3.96484 23.631 3.76395 23.631 3.57143C23.631 3.27009 23.6617 2.98549 23.7203 2.70089C22.7382 2.43304 22.2192 1.86663 21.7114 1.31696C21.145 0.703125 20.4949 0 19.3453 0ZM27.9167 0.714286C26.3403 0.714286 25.0596 1.99777 25.0596 3.57143C25.0596 5.14509 26.3403 6.42857 27.9167 6.42857C29.4932 6.42857 30.7739 5.14509 30.7739 3.57143C30.7739 1.99777 29.4932 0.714286 27.9167 0.714286ZM16.4882 7.85714C7.82188 7.85714 0.77389 12.2712 0.77389 18.5714C0.77389 24.8717 7.82188 30 16.4882 30C25.1545 30 32.2025 24.8717 32.2025 18.5714C32.2025 12.2712 25.1545 7.85714 16.4882 7.85714ZM3.98818 8.52679C2.94465 8.52679 1.95414 8.95368 1.198 9.70982C-0.0324718 10.9403 -0.286378 12.7093 0.416747 14.1741C1.49655 12.0843 3.3548 10.3013 5.75157 8.97321C5.20748 8.69699 4.6048 8.52679 3.98818 8.52679ZM28.9882 8.52679C28.3715 8.52679 27.7689 8.69699 27.2248 8.97321C29.6215 10.3013 31.4798 12.0843 32.5596 14.1741C33.2627 12.7093 33.0088 10.9403 31.7784 9.70982C31.0222 8.95368 30.0317 8.52679 28.9882 8.52679ZM10.7739 14.2857C11.9569 14.2857 12.9167 15.2455 12.9167 16.4286C12.9167 17.6116 11.9569 18.5714 10.7739 18.5714C9.59085 18.5714 8.63103 17.6116 8.63103 16.4286C8.63103 15.2455 9.59085 14.2857 10.7739 14.2857ZM22.2025 14.2857C23.3855 14.2857 24.3453 15.2455 24.3453 16.4286C24.3453 17.6116 23.3855 18.5714 22.2025 18.5714C21.0194 18.5714 20.0596 17.6116 20.0596 16.4286C20.0596 15.2455 21.0194 14.2857 22.2025 14.2857ZM10.1042 22.1429C10.2828 22.1735 10.4586 22.274 10.573 22.433C10.6483 22.5391 12.3224 24.7768 16.4882 24.7768C20.7097 24.7768 22.3866 22.4777 22.4034 22.4554C22.6294 22.1345 23.0842 22.048 23.4078 22.2768C23.7287 22.5028 23.7901 22.9353 23.5641 23.2589C23.4804 23.3789 21.4435 26.2054 16.4882 26.2054C11.53 26.2054 9.49599 23.3789 9.41228 23.2589C9.18628 22.9353 9.24487 22.5028 9.56853 22.2768C9.73036 22.1624 9.92568 22.1122 10.1042 22.1429Z" fill="white"/>
+    </svg>
+  );
+};
+
+const TelegramIcon = () => {
+  return (
+    <svg 
+      width="34" 
+      height="30" 
+      viewBox="0 0 34 30" 
+      fill="none" 
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M33.2997 0.412412C32.7372 -0.0645891 31.8537 -0.132839 30.9402 0.233912H30.9387C29.978 0.619413 3.7429 11.8724 2.6749 12.3322C2.48065 12.3997 0.784145 13.0327 0.958896 14.4427C1.1149 15.714 2.4784 16.2405 2.6449 16.3012L9.31467 18.585C9.75717 20.058 11.3884 25.4925 11.7492 26.6535C11.9742 27.3772 12.3409 28.3282 12.9837 28.524C13.5477 28.7415 14.1087 28.5427 14.4717 28.2577L18.5494 24.4755L25.1322 29.6092L25.289 29.703C25.736 29.901 26.1642 30 26.573 30C26.8887 30 27.1917 29.9408 27.4812 29.8222C28.4675 29.4172 28.862 28.4775 28.9032 28.371L33.8202 2.81317C34.1202 1.44817 33.7032 0.753663 33.2997 0.412412ZM15.1969 19.4985L12.9469 25.4985L10.6969 17.9985L27.947 5.24843L15.1969 19.4985Z" fill="white"/>
+    </svg>
+  );
+};
+
 const IconContainer = styled.div`
-  display: grid;
-  place-content: center;
-  padding: var(--Main-System-20px, 20px);
-  /* padding: 2px; */
+  display: flex;
+  padding: var(--Main-System-15px, 15px);
   align-items: flex-start;
   gap: var(--Main-System-10px, 10px);
   border-radius: 100px;
-  background: rgb(153, 51, 255);
-  width: 50px;
-  height: 50px;
-  /* :hover{
-    background: hsl(var(--background));
-  } */
-  /* aspect-ratio: 1; */
+  background: #93f;
+  width: 30px;
 `;
 
 const Footer: React.FC = () => {
   const isDarkTheme = useSelector(
     (state: RootState) => state.theme.isDarkTheme
   );
+
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
   return (
     <FooterRoot
-      className="md:py-20 md:px-16 p-4"
-      style={{ background: isDarkTheme ? "rgb(22, 23, 23)" : undefined }}
+      style={{ 
+        background: isDarkTheme ? "rgb(22, 23, 23)" : undefined, 
+        padding: isSmallScreen ? "20px 20px":"80px"
+      }}
     >
-      <Grid container spacing={3}>
+      <Grid container spacing={10}>
         <Grid item xs={12} sm={12} md={6}>
           <Container>
             <BrandLogo src={isDarkTheme ? DarkLogo : LightLogo} />
@@ -167,12 +235,28 @@ const Footer: React.FC = () => {
               Immerse yourself in a vibrant community of collectors and
               creators. Experience the thrill of discovery today.
             </Description>
+            <SubmitContainer>
+              <EmailInput placeholder="Input your Email"/>
+              {/* <input type="input" placeholder="Input your Email"/> */}
+              {/* <button type="button">Submit</button> */}
+              <EmailSubmit>Submit</EmailSubmit>
+            </SubmitContainer>
             <SocialContainer>
               <SocialHeading>Join us</SocialHeading>
               <SocialButtonGroup>
                 <Link to="https://x.com/NautilusNFTs" target="_blank">
                   <IconContainer>
                     <XIcon />
+                  </IconContainer>
+                </Link>
+                <Link to="#" target="_blank">
+                  <IconContainer>
+                    <RedditIcon />
+                  </IconContainer>
+                </Link>
+                <Link to="#" target="_blank">
+                  <IconContainer>
+                    <TelegramIcon />
                   </IconContainer>
                 </Link>
                 <Link to="https://discord.gg/qp3FT47txs" target="_blank">
@@ -185,26 +269,30 @@ const Footer: React.FC = () => {
           </Container>
         </Grid>
         <Grid item xs={12} sm={12} md={4}>
-          <Grid className="gap-3 md:gap-0" container>
-            <Grid item xs={12} md={6}>
+          <Grid container>
+            <Grid item xs={6} md={6}>
               <FooterHeading
                 style={{
                   color: isDarkTheme ? "white" : undefined,
+                  margin: '0px'
                 }}
               >
                 Marketplace
               </FooterHeading>
               <FooterList>
                 <FooterLink>Collections</FooterLink>
-                <FooterLink>Actions</FooterLink>
-                <FooterLink>Buys</FooterLink>
+                <FooterLink>Auctions</FooterLink>
+                <FooterLink>Our Competition</FooterLink>
+                <FooterLink>Buy</FooterLink>
                 <FooterLink>Sell</FooterLink>
+                <FooterLink>Activity</FooterLink>
               </FooterList>
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={6} md={6}>
               <FooterHeading
                 style={{
                   color: isDarkTheme ? "white" : undefined,
+                  margin: '0px'
                 }}
               >
                 Links
@@ -212,31 +300,14 @@ const Footer: React.FC = () => {
               <FooterList>
                 <FooterLink>Privacy Policy</FooterLink>
                 <FooterLink>Terms</FooterLink>
-                <FooterLink>FAQs</FooterLink>
+                <FooterLink>Community guidelines</FooterLink>
                 <FooterLink>Report a Bug</FooterLink>
               </FooterList>
             </Grid>
           </Grid>
         </Grid>
-        <Grid item xs={12}>
-          <Stack
-            direction="row"
-            spacing={2}
-            alignItems="center"
-            sx={{ justifyContent: "space-between" }}
-          >
-            <Copyright>© 2024 Nautilus. All Rights Reserved.</Copyright>
-          </Stack>
-        </Grid>
-        <Grid item xs={12}>
-          <Typography
-            align="left"
-            sx={{ color: isDarkTheme ? "white" : "black" }}
-            variant="body2"
-            color="textSecondary"
-          >
-            Ver {currentVersion}.{deploymentVersion}
-          </Typography>
+        <Grid item xs={12} display={'flex'} justifyContent={'center'}>
+          <Copyright>© 2024 Voi Market. All Rights Reserved.</Copyright>
         </Grid>
       </Grid>
     </FooterRoot>

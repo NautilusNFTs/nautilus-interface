@@ -329,7 +329,7 @@ export const Activity: React.FC = () => {
           </SectionHeading>
           <Grid container spacing={2} sx={{ mt: 5 }}>
             {Array.from({ length: 12 }).map((_, i) => (
-              <Grid key={i} item xs={6} sm={4} md={3}>
+              <Grid item xs={6} sm={4} md={3}>
                 <Skeleton
                   sx={{ borderRadius: 10 }}
                   variant="rounded"

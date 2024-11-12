@@ -40,8 +40,5 @@ mpDb.version(2).stores({
   listings:
     "pk, mpContractId, mpListingId, tokenId, seller, currency, price, round, timestamp, collectionId, endTimestamp, royalty, transactionId",
 });
-mpDb.version(3).stores({
-  smartTokens: "pk, contractId, name, symbol, decimals, totalSupply, creator, mintRound, globalState, tokenId, price",
-})
 
 export default mpDb;

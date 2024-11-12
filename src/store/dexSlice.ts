@@ -1,9 +1,9 @@
 // reducers.ts
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { RootState } from "./store";
-import { CONTRACT, abi, swap } from "ulujs";
+import { swap200 } from "ulujs";
 import { getAlgorandClients } from "../wallets";
-import BigNumber from "bignumber.js";
+import { CTCINFO_LP_WVOI_VOI } from "../contants/dex";
 
 export interface DexState {
   prices: any[];
@@ -17,22 +17,20 @@ export const getPrices = createAsyncThunk<
   { rejectValue: string; state: RootState }
 >("dex/getPrices", async (_, { getState, rejectWithValue }) => {
   try {
-    /*
-    const ctcInfo = 34099095; // wVOI2/VIA
+    const ctcInfo = CTCINFO_LP_WVOI_VOI;
     const { algodClient, indexerClient } = getAlgorandClients();
-    const ci = new swap(ctcInfo, algodClient, indexerClient);
+    const ci = new swap200(ctcInfo, algodClient, indexerClient);
     const InfoR = await ci.Info();
     if (!InfoR.success) {
       throw new Error(InfoR.error);
     }
     const Info = InfoR.returnValue;
-    const {
-      poolBals: [balA, balB],
-    } = Info;
-    const balABn = new BigNumber(balA);
-    const balBBn = new BigNumber(balB);
-    const rateSU = balABn.dividedBy(balBBn).toNumber();
-    const prices = [
+    const [, [balA, balB]] = Info;
+    const prec = BigInt(10000000);
+    const rateAU = (prec * balA) / balB;
+    const rateSU = Number(rateAU) / Number(prec);
+    //const invRateSu = 1 / rateSU;
+    return [
       {
         contractId: ctcInfo,
         tokA: "wVOI",
@@ -40,17 +38,6 @@ export const getPrices = createAsyncThunk<
         rate: rateSU,
       },
     ];
-    return prices;
-    */
-    const prices = [
-      {
-        contractId: 34099095,
-        tokA: "wVOI2",
-        tokB: "VIA",
-        rate: 1,
-      },
-    ];
-    return prices;
   } catch (error: any) {
     return rejectWithValue(error.message);
   }

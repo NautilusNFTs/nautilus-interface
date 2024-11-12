@@ -366,7 +366,7 @@ const SalesTable: React.FC<Props> = ({ sales }) => {
           </HeadingDateContainer>
         </HistoryTableHead>
         {sales.slice(0, displayRows).map((sale, index) => (
-          <HistoryTableRow key={`${index}_${sale?.seller}_${sale?.buyer}`}>
+          <HistoryTableRow>
             <HistoryEventValueContainer>
               <HistoryEventValueLabel
                 className="label
@@ -393,20 +393,18 @@ const SalesTable: React.FC<Props> = ({ sales }) => {
                       <path
                         d="M3.16675 7.33311L8.50008 8.66634L13.8334 7.33301M3.16675 7.33311L8.50008 1.33301M3.16675 7.33311L8.50008 5.99973M13.8334 7.33301L8.50008 1.33301M13.8334 7.33301L8.50008 5.99973M8.50008 1.33301V5.99973M4.16675 9.99967L8.50016 14.6663L12.8334 9.99967L8.50008 10.9997L4.16675 9.99967Z"
                         stroke="white"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
                       />
                     </svg>
                     </HistoryPriceValueCurrency>*/}
                   <HistoryPriceValueLabel>
                     <HistoryPriceValueLabelMain className="label">
-                      {sale.price} {sale.currency}
+                      {sale.price.toLocaleString()} VIA
                     </HistoryPriceValueLabelMain>
-                    {sale.normalPrice ? (
-                      <HistoryPriceValueLabelSub>
-                        {sale.normalPrice} VOI
-                      </HistoryPriceValueLabelSub>
-                    ) : null}
+                    {/*<HistoryPriceValueLabelSub>
+                      {sale.normalPrice}
+                    </HistoryPriceValueLabelSub>*/}
                   </HistoryPriceValueLabel>
                 </HistoryPriceValueWrapper>
               </HistoryPriceValue>
@@ -435,9 +433,9 @@ const SalesTable: React.FC<Props> = ({ sales }) => {
                 <path
                   d="M14 6L14 2M14 2H10M14 2L8.66667 7.33333M6.66667 3.33333H5.2C4.0799 3.33333 3.51984 3.33333 3.09202 3.55132C2.71569 3.74307 2.40973 4.04903 2.21799 4.42535C2 4.85318 2 5.41323 2 6.53333V10.8C2 11.9201 2 12.4802 2.21799 12.908C2.40973 13.2843 2.71569 13.5903 3.09202 13.782C3.51984 14 4.0799 14 5.2 14H9.46667C10.5868 14 11.1468 14 11.5746 13.782C11.951 13.5903 12.2569 13.2843 12.4487 12.908C12.6667 12.4802 12.6667 11.9201 12.6667 10.8V9.33333"
                   stroke="#161717"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
                 />
                   </HistoryDateValueIcon>*/}
             </HistoryDateValueContainer>
@@ -462,9 +460,9 @@ const SalesTable: React.FC<Props> = ({ sales }) => {
               <path
                 d="M10.0001 4.16699V15.8337M10.0001 15.8337L15.8334 10.0003M10.0001 15.8337L4.16675 10.0003"
                 stroke="#9933FF"
-                strokeWidth="1.67"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                stroke-width="1.67"
+                stroke-linecap="round"
+                stroke-linejoin="round"
               />
             </SecondaryButtonIcon>
           </SecondaryButton>

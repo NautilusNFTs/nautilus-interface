@@ -1,7 +1,6 @@
-import { HIGHFORGE_CDN } from "@/config/arc72-idx";
-import { CollectionI, RankingI, Token, TokenType } from "../types";
-import { BigNumber } from "bignumber.js";
-import { stripTrailingZeroBytes } from "./string";
+//import { fee } from "../constants/mp";
+
+import { CollectionI, RankingI, Token } from "../types";
 
 export const computeExtraPayment = (
   price: any,
@@ -143,52 +142,41 @@ export const getRankings = (
   collections: CollectionI[],
   sales: any,
   listings: any,
-  exchangeRate: number,
-  smartTokens: TokenType[]
+  exchangeRate: number
 ) => {
   const scores = new Map();
   const saleCounts = new Map();
   for (const sale of sales) {
-    const currency = smartTokens.find(
-      (t: any) => `${t.contractId}` === `${sale.currency}`
-    );
-    const currencyDecimals =
-      currency?.decimals === 0 ? 0 : currency?.decimals || 6;
-    const exchangeRate = sale.currency === 0 ? 1 : currency?.price || 0;
-    const priceBn = new BigNumber(sale?.price).div(
-      new BigNumber(10).pow(currencyDecimals)
-    );
-    const normalPriceBn = priceBn.multipliedBy(new BigNumber(exchangeRate));
     if (scores.has(sale.collectionId)) {
       scores.set(
         sale.collectionId,
-        scores.get(sale.collectionId) + normalPriceBn.toNumber()
+        scores.get(sale.collectionId) +
+          (sale.currency === 0 ? sale.price / exchangeRate : sale.price)
       );
       saleCounts.set(sale.collectionId, saleCounts.get(sale.collectionId) + 1);
     } else {
-      scores.set(sale.collectionId, normalPriceBn.toNumber());
+      scores.set(
+        sale.collectionId,
+        sale.currency === 0 ? sale.price / exchangeRate : sale.price
+      );
       saleCounts.set(sale.collectionId, 1);
     }
   }
   const floors = new Map();
   for (const listing of listings) {
-    const currency = smartTokens.find(
-      (t: any) => `${t.contractId}` === `${listing.currency}`
-    );
-    const currencyDecimals =
-      currency?.decimals === 0 ? 0 : currency?.decimals || 6;
-    const exchangeRate = listing.currency === 0 ? 1 : currency?.price || 0;
-    const priceBn = new BigNumber(listing?.price).div(
-      new BigNumber(10).pow(currencyDecimals)
-    );
-    const normalPriceBn = priceBn.multipliedBy(new BigNumber(exchangeRate));
     if (floors.has(listing.collectionId)) {
       floors.set(
         listing.collectionId,
-        Math.min(floors.get(listing.collectionId), normalPriceBn.toNumber())
+        Math.min(
+          floors.get(listing.collectionId),
+          listing.currency === 0 ? listing.price / exchangeRate : listing.price
+        )
       );
     } else {
-      floors.set(listing.collectionId, normalPriceBn.toNumber());
+      floors.set(
+        listing.collectionId,
+        listing.currency === 0 ? listing.price / exchangeRate : listing.price
+      );
     }
   }
   const rankings = Array.from(scores.entries()).map((kv: any) => {
@@ -209,32 +197,23 @@ export const getRankings = (
     }
     const floorPrice = floors.get(kv[0]) || 0;
     const volume = kv[1];
-    const collectionsMissingImage: number[] = [];
+    const collectionsMissingImage = [35720076];
     const url = !collectionsMissingImage.includes(token.contractId)
-      ? `${HIGHFORGE_CDN}/i/${stripTrailingZeroBytes(
-          encodeURIComponent(token.metadataURI)
+      ? `https://prod.cdn.highforge.io/i/${encodeURIComponent(
+          token.metadataURI
         )}?w=240`
-      : stripTrailingZeroBytes(token.metadata?.image);
-
-    const image = stripTrailingZeroBytes(token?.metadata?.image || "");
-
-    const name = `${token?.metadata?.name?.replace(/[0-9 #]*$/, "")}`;
-
+      : token.metadata.image;
     return {
       collectionId: kv[0],
-      image:
-        kv[0] === 421076
-          ? "https://prod.cdn.highforge.io/i/ipfs%3A%2F%2FQmVbGFgCgeW9mMBHHRmTY5TPA3kVLxFHpb2ztP3GArzzEQ%23arc3?w=400"
-          : image,
+      image: url,
       floorPrice,
       volume,
-      name: kv[0] === 421076 ? "Nautilus Voi Staking" : name,
-      score: `${Math.round(volume).toLocaleString()}`,
+      name: `${token?.metadata?.name?.replace(/[0-9 #]*$/, "")}`,
+      score: `${Math.round(volume / 1e6).toLocaleString()}`,
       rank: volume,
-      scoreUnit: "VOI",
+      scoreUnit: "VIA",
       owners: owners.size,
       items: collection?.totalSupply || 0,
-      listings: listings.filter((l: any) => l.collectionId === kv[0]).length,
       sales: saleCount,
       exchangeRate,
     };
@@ -246,7 +225,7 @@ export const getRankings = (
       return b.rank - a.rank;
     }
   });
-  return rankings; //.filter((r: RankingI) => r.name != "undefined");
+  return rankings;
 };
 
 export const compactAddress = (address: string) =>

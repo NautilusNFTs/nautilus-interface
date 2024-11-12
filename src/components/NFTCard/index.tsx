@@ -266,11 +266,11 @@ const NftCard: React.FC<NFTCardProps> = ({
                       />
                     </Tooltip>
                   ) : null}
-                  {currency !== "VOI" ? (
-                    <Tooltip placement="top" title={currency}>
+                  {currency === "VIA" ? (
+                    <Tooltip placement="top" title="VIA">
                       <img
                         src={ViaIcon}
-                        alt={currency}
+                        alt="VIA"
                         style={{
                           height: "20px",
                           width: "20px",

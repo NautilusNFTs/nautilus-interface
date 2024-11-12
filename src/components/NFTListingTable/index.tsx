@@ -6,7 +6,6 @@ import TableCell from "@mui/material/TableCell";
 import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
-import Button from "@mui/material/Button";
 import Paper from "@mui/material/Paper";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
@@ -19,7 +18,6 @@ import {
   Sale,
   SaleI,
   Token,
-  TokenType,
 } from "../../types";
 import { compactAddress } from "../../utils/mp";
 import moment from "moment";
@@ -29,18 +27,6 @@ import UpIcon from "../../static/icon/icon-up.svg";
 import DownIcon from "../../static/icon/icon-down.svg";
 import InfoIcon from "@mui/icons-material/Info";
 import VoiIcon from "../../static/crypto-icons/voi/0.svg";
-import { HIGHFORGE_CDN } from "@/config/arc72-idx";
-import { formatter } from "@/utils/number";
-import { useStakingContract } from "@/hooks/staking";
-import { useWallet } from "@txnlab/use-wallet-react";
-import { getAlgorandClients } from "@/wallets";
-import { toast } from "react-toastify";
-import BigNumber from "bignumber.js";
-import { mp, swap } from "ulujs";
-import BuySaleModal, { multiplier } from "../modals/BuySaleModal";
-import algosdk from "algosdk";
-import { TOKEN_WVOI } from "@/contants/tokens";
-import { stakingRewards } from "@/static/staking/staking";
 
 const StyledImage = styled(Box)`
   width: 53px;
@@ -90,249 +76,6 @@ const StyledTableRow = mstyled(TableRow)(({ theme }) => {
   };
 });
 
-const computeListingDiscount = (listing: ListingI) => {
-  if (!listing.rewards || !listing) return 0;
-  const { rewards } = listing;
-  ((Number(rewards.total || listing.staking.global_total) -
-    Number(listing.price / 1e6)) /
-    Number(rewards.total || listing.staking.global_total)) *
-    100;
-};
-
-interface NFTListingTableRowProps {
-  listing: ListingI;
-}
-
-const NFTListingTableRow: React.FC<NFTListingTableRowProps> = ({ listing }) => {
-  const token = listing.token as Token;
-  const metadata = JSON.parse(token.metadata || "{}");
-  const { activeAccount, signTransactions } = useWallet();
-  const [isBuying, setIsBuying] = useState(false);
-
-  const { data: stakingContractData, isLoading: loadingStakingContractData } =
-    useStakingContract(listing.token?.tokenId || 0);
-
-  const smartTokens = useSelector((state: any) => state.smartTokens.tokens);
-  const [openBuyModal, setOpenBuyModal] = React.useState(false);
-
-  const handleCartIconClick = async (pool: any, discount: any) => {
-    if (!activeAccount || !listing) {
-      toast.info("Please connect wallet!");
-      return;
-    }
-    try {
-      setIsBuying(true);
-      // -------------------------------------
-      // SIM HERE
-      // -------------------------------------
-      const { algodClient, indexerClient } = getAlgorandClients();
-      let customR;
-      for (const skipEnsure of [true, false]) {
-        if (pool) {
-          const {
-            contractId: poolId,
-            tokAId,
-            tokBId,
-            poolBalA,
-            poolBalB,
-          } = pool;
-          // -------------------------------------
-          const tokA: TokenType = smartTokens.find(
-            (el: any) => `${el.contractId}` === tokAId
-          );
-          const tokB: TokenType = smartTokens.find(
-            (el: any) => `${el.contractId}` === tokBId
-          );
-          const inToken = tokA?.tokenId === "0" ? tokA : tokB;
-          const outToken = tokA?.tokenId !== "0" ? tokA : tokB;
-          const ratio =
-            inToken === tokA
-              ? new BigNumber(poolBalA).div(poolBalB).toNumber()
-              : new BigNumber(poolBalB).div(poolBalA).toNumber();
-          // figure out how much to swap
-          const swapR: any = await new swap(
-            poolId,
-            algodClient,
-            indexerClient
-          ).swap(
-            activeAccount.address,
-            poolId,
-            {
-              amount: new BigNumber(ratio)
-                .times(
-                  new BigNumber(listing.price).minus(
-                    new BigNumber(discount || 0)
-                  )
-                )
-                .times(multiplier)
-                .toFixed(6),
-              contractId: inToken?.contractId,
-              tokenId: "0",
-              symbol: "VOI",
-            },
-            {
-              contractId: outToken?.contractId,
-              symbol: outToken?.symbol,
-              decimals: `${outToken?.decimals}`,
-            }
-          );
-          if (!swapR.success) throw new Error("swap failed");
-          const returnValue = swapR.response.txnGroups[0].txnResults
-            .slice(-1)[0]
-            .txnResult.logs.slice(-1)[0];
-
-          const selector = returnValue.slice(0, 4).toString("hex");
-          const outA = algosdk.bytesToBigInt(returnValue.slice(4, 36));
-          const outB = algosdk.bytesToBigInt(returnValue.slice(36, 68));
-
-          customR = await mp.buy(
-            activeAccount.address,
-            listing,
-            listing.currency,
-            {
-              paymentTokenId:
-                listing.currency === 0 ? TOKEN_WVOI : listing.currency,
-              wrappedNetworkTokenId: TOKEN_WVOI,
-              extraTxns: swapR.objs,
-              algodClient,
-              indexerClient,
-              skipEnsure,
-            }
-          );
-        } else {
-          // no pool
-          const paymentToken = smartTokens.find(
-            (el: any) => `${el.contractId}` === `${listing.currency}`
-          );
-          customR = await mp.buy(activeAccount.address, listing, paymentToken, {
-            paymentTokenId:
-              listing.currency === 0 ? TOKEN_WVOI : listing.currency,
-            wrappedNetworkTokenId: TOKEN_WVOI,
-            extraTxns: [],
-            algodClient,
-            indexerClient,
-            skipEnsure,
-          });
-        }
-        if (customR.success) break;
-      }
-      console.log({ customR });
-      if (!customR.success) throw new Error("custom failed at end"); // abort
-      // -------------------------------------
-      // SIGM HERE
-      // -------------------------------------
-      const stxn = await signTransactions(
-        customR.txns.map(
-          (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
-        )
-      );
-      await algodClient.sendRawTransaction(stxn as Uint8Array[]).do();
-      // -------------------------------------
-      // QUEST HERE buy
-      // -------------------------------------
-      // do {
-      //   const address = activeAccount.address;
-      //   const actions: string[] = [QUEST_ACTION.SALE_BUY_ONCE];
-      //   const {
-      //     data: { results },
-      //   } = await getActions(address);
-      //   for (const action of actions) {
-      //     const address = activeAccount.address;
-      //     const key = `${action}:${address}`;
-      //     const completedAction = results.find((el: any) => el.key === key);
-      //     if (!completedAction) {
-      //       const { collectionId: contractId, tokenId } = listing;
-      //       await submitAction(action, address, {
-      //         contractId,
-      //         tokenId,
-      //       });
-      //     }
-      //     // TODO notify quest completion here
-      //   }
-      // } while (0);
-      // -------------------------------------
-      toast.success("Purchase successful!");
-    } catch (e: any) {
-      console.log(e);
-      toast.error(e.message);
-    } finally {
-      setIsBuying(false);
-      setOpenBuyModal(false);
-    }
-  };
-
-  return (
-    !loadingStakingContractData && (
-      <>
-        <StyledTableRow>
-          <StyledTableCell
-            style={{
-              color:
-                stakingContractData[0].type === "Staking" ? "orange" : "green",
-            }}
-          >
-            {stakingContractData[0].type}
-          </StyledTableCell>
-          <StyledTableCell>{listing.token?.tokenId}</StyledTableCell>
-          <StyledTableCell>
-            {stakingContractData[0].global_period_limit > 5
-              ? stakingContractData[0].global_period + 1
-              : stakingContractData[0].global_period * 12}
-          </StyledTableCell>
-          <StyledTableCell>
-            {stakingContractData[0].global_period_limit > 5
-              ? stakingContractData[0].global_distribution_count
-              : stakingContractData[0].global_distribution_count}
-          </StyledTableCell>
-          <StyledTableCell>
-            {formatter.format(stakingContractData[0].global_total)} VOI
-          </StyledTableCell>
-
-          <StyledTableCell>
-            {formatter.format(listing.price / 1e6)} VOI
-          </StyledTableCell>
-          <StyledTableCell>
-            {(
-              ((Number(stakingContractData[0].global_total) -
-                Number(listing.price / 1e6)) /
-                Number(stakingContractData[0].global_total)) *
-              100
-            ).toFixed(2)}
-            %
-          </StyledTableCell>
-          <StyledTableCell>
-            <Button
-              variant="text"
-              onClick={() => {
-                setOpenBuyModal(true);
-              }}
-            >
-              Buy
-            </Button>
-          </StyledTableCell>
-        </StyledTableRow>
-        <BuySaleModal
-          token={listing.token}
-          listing={listing}
-          seller={listing.seller}
-          open={openBuyModal}
-          loading={isBuying}
-          handleClose={() => setOpenBuyModal(false)}
-          onSave={handleCartIconClick}
-          title="Buy NFT"
-          buttonText="Buy"
-          image={metadata?.image || ""}
-          price={(listing?.price || 0) / 10 ** 6}
-          priceNormal={""}
-          priceAU={listing.price.toString()}
-          currency={"VOI"}
-          paymentTokenId={listing.currency}
-        />
-      </>
-    )
-  );
-};
-
 interface Props {
   listings: ListingI[];
   tokens: Token[];
@@ -355,10 +98,7 @@ const NFTListingTable: React.FC<Props> = ({
   enableSelect = false,
   onSelect = (x) => {},
 }) => {
-  const { isDarkTheme } = useSelector((state: RootState) => state.theme);
   type SortOption =
-    | "discount-asc"
-    | "discount-dsc"
     | "price-asc"
     | "price-dsc"
     | "timestamp-asc"
@@ -367,7 +107,7 @@ const NFTListingTable: React.FC<Props> = ({
     | "token-dsc"
     | "seller-asc"
     | "seller-dsc";
-  const [sortBy, setSortBy] = useState<SortOption>("discount-dsc");
+  const [sortBy, setSortBy] = useState<SortOption>("timestamp-dsc");
 
   const isLoading = !listings || !collections || !tokens;
 
@@ -385,12 +125,7 @@ const NFTListingTable: React.FC<Props> = ({
         (token) =>
           token.tokenId === b.tokenId && token.contractId === b.collectionId
       ) || ({} as Token);
-    if (sortBy === "discount-asc") {
-      return b.staking.discount - a.staking.discount;
-    }
-    if (sortBy === "discount-dsc") {
-      return b.staking.discount - b.staking.discount;
-    } else if (sortBy === "token-asc") {
+    if (sortBy === "token-asc") {
       return tokenA.metadata?.name?.localeCompare(tokenB.metadata?.name);
     } else if (sortBy === "token-dsc") {
       return tokenB.metadata?.name.localeCompare(tokenA.metadata?.name);
@@ -414,38 +149,20 @@ const NFTListingTable: React.FC<Props> = ({
       .filter((sale: ListingI) => sale.price > 0)
       .slice(0, limit > 0 ? limit : listings.length);
   }, [sortBy, listings]);
-  console.log({ sortedListings });
   return !isLoading ? (
     <TableContainer>
       <Table aria-label="rankings table">
         <TableHead>
           <StyledTableRow>
-            <StyledTableHeading>
-              <Box>Type</Box>
-            </StyledTableHeading>
-            <StyledTableHeading>
-              <Box>Account Id</Box>
-            </StyledTableHeading>
-            <StyledTableHeading>
-              <Box>Lockup [Months]</Box>
-            </StyledTableHeading>
-            <StyledTableHeading>
-              <Box>Vesting [Months]</Box>
-            </StyledTableHeading>
-            <StyledTableHeading>
-              <Box>Total Tokens</Box>
-            </StyledTableHeading>
-
-            {/*columns.includes("timestamp") ? (
-              <StyledTableHeading
+            {columns.includes("timestamp") ? (
+              <StyledTableCell
                 sx={{ display: { xs: "none", md: "table-cell" } }}
               >
                 <Stack
                   direction="row"
                   spacing={1}
-                  sx={{ justifyContent: "center" }}
+                  sx={{ justifyContent: "end" }}
                 >
-                  <Box>Time</Box>
                   <img
                     src={
                       ["timestamp-asc", "timestamp-dsc"].includes(sortBy)
@@ -464,8 +181,8 @@ const NFTListingTable: React.FC<Props> = ({
                     }
                   />
                 </Stack>
-              </StyledTableHeading>
-            ) : null*/}
+              </StyledTableCell>
+            ) : null}
             {columns.includes("image") ? (
               <StyledTableCell></StyledTableCell>
             ) : null}
@@ -531,10 +248,7 @@ const NFTListingTable: React.FC<Props> = ({
             ) : null}
             <StyledTableHeading>
               <Stack
-                sx={{
-                  justifyContent: "center",
-                  color: isDarkTheme ? "#fff" : "#000",
-                }}
+                sx={{ justifyContent: "center" }}
                 direction="row"
                 spacing={1}
               >
@@ -560,46 +274,16 @@ const NFTListingTable: React.FC<Props> = ({
                 />
               </Stack>
             </StyledTableHeading>
-            {columns.includes("discount") ? (
-              <StyledTableHeading>
-                <Stack
-                  sx={{ justifyContent: "center" }}
-                  direction="row"
-                  spacing={1}
-                >
-                  <Box>Discount</Box>
-                  <img
-                    src={
-                      ["discount-asc", "discount-dsc"].includes(sortBy)
-                        ? sortBy === "discount-asc"
-                          ? UpIcon
-                          : DownIcon
-                        : SelectorIcon
-                    }
-                    onClick={() => {
-                      setSortBy(
-                        ["discount-asc", "discount-dsc"].includes(sortBy)
-                          ? sortBy === "discount-asc"
-                            ? "discount-dsc"
-                            : "discount-asc"
-                          : "discount-dsc"
-                      );
-                    }}
-                    alt="selector"
-                  />
-                </Stack>
-              </StyledTableHeading>
-            ) : null}
-            <StyledTableHeading
-              sx={{ display: { xs: "none", md: "table-cell" } }}
-            >
-              <Box>Actions</Box>
-            </StyledTableHeading>
           </StyledTableRow>
         </TableHead>
         <TableBody>
           {sortedListings.map((listing, index) => {
-            const token = listing.token as Token;
+            const token: Token =
+              tokens.find(
+                (token) =>
+                  token.tokenId === listing.tokenId &&
+                  token.contractId === listing.collectionId
+              ) || ({} as Token);
             const collection: CollectionI =
               collections.find(
                 (collection) => collection.contractId === listing.collectionId
@@ -607,54 +291,37 @@ const NFTListingTable: React.FC<Props> = ({
             const pk = `${listing.mpContractId}-${listing.mpListingId}`;
             if (!token || !collection) return null;
             return (
-              <>
-                <NFTListingTableRow listing={listing} />
-                {false && (
-                  <StyledTableRow
-                    onClick={() => {
-                      if (enableSelect) {
-                        onSelect(
-                          `${listing.mpContractId}-${listing.mpListingId}`
-                        );
-                      }
-                    }}
-                    selected={enableSelect && selected === pk}
-                    hover={true}
-                    key={index}
-                  >
-                    <StyledTableCell>
-                      <Box>Staking</Box>
-                    </StyledTableCell>
-                    <StyledTableCell>
-                      <Box>{listing.token?.tokenId}</Box>
-                    </StyledTableCell>
-                    <StyledTableCell>
-                      <Box>12</Box>
-                    </StyledTableCell>
-                    <StyledTableCell>
-                      <Box>12</Box>
-                    </StyledTableCell>
-                    {/*columns.includes("timestamp") ? (
+              <StyledTableRow
+                onClick={() => {
+                  if (enableSelect) {
+                    onSelect(`${listing.mpContractId}-${listing.mpListingId}`);
+                  }
+                }}
+                selected={enableSelect && selected === pk}
+                hover={true}
+                key={index}
+              >
+                {columns.includes("timestamp") ? (
                   <StyledTableCell
                     sx={{ display: { xs: "none", md: "table-cell" } }}
                   >
-                    {moment.unix(listing.createTimestamp).fromNow()}
+                    {moment.unix(listing.timestamp).fromNow()}
                   </StyledTableCell>
-                ) : null*/}
-                    {/*columns.includes("image") ? (
+                ) : null}
+                {columns.includes("image") ? (
                   <StyledTableCell>
                     <Link
                       to={`/collection/${collection.contractId}/token/${token.tokenId}`}
                     >
                       <StyledImage
                         sx={{
-                          backgroundImage: `url(${HIGHFORGE_CDN}/i/${token.metadataURI}?w=240)`,
+                          backgroundImage: `url(https://prod.cdn.highforge.io/i/${token.metadataURI}?w=240)`,
                         }}
                       />
                     </Link>
                   </StyledTableCell>
-                ) : null*/}
-                    {/*columns.includes("token") ? (
+                ) : null}
+                {columns.includes("token") ? (
                   <StyledTableCell>
                     <Link
                       to={`/collection/${collection.contractId}/token/${token.tokenId}`}
@@ -662,31 +329,34 @@ const NFTListingTable: React.FC<Props> = ({
                       {token.metadata?.name}
                     </Link>
                   </StyledTableCell>
-                ) : null*/}
-                    {/*columns.includes("seller") ? (
+                ) : null}
+                {columns.includes("seller") ? (
                   <StyledTableCell>
                     <Link to={`/account/${listing.seller}`}>
                       {compactAddress(listing.seller)}
                     </Link>
                   </StyledTableCell>
-                ) : null*/}
-                    {columns.includes("price") ? (
-                      <StyledTableCell>
-                        {formatter.format(listing.price / 1e6)} VOI
-                      </StyledTableCell>
-                    ) : null}
-                    {columns.includes("price") ? (
-                      <StyledTableCell>
-                        {formatter.format(listing.price / 1e6)} VOI
-                      </StyledTableCell>
-                    ) : null}
-
-                    {columns.includes("discount") ? (
-                      <StyledTableCell>1%</StyledTableCell>
-                    ) : null}
-                  </StyledTableRow>
-                )}
-              </>
+                ) : null}
+                {columns.includes("price") ? (
+                  <StyledTableCell>
+                    {(listing.price / 1e6).toLocaleString()}{" "}
+                    {listing.currency === 0 ? "VOI" : "VIA"}
+                    <br />
+                    <span
+                      style={{
+                        color: "#717579",
+                        fontSize: "12px",
+                      }}
+                    >
+                      {listing.price !== listing.normalPrice
+                        ? ` (~${Math.round(
+                            (listing?.normalPrice || 0) / 1e6
+                          ).toLocaleString()} VOI)`
+                        : null}
+                    </span>
+                  </StyledTableCell>
+                ) : null}
+              </StyledTableRow>
             );
           })}
         </TableBody>

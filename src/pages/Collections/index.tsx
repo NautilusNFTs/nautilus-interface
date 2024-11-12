@@ -15,17 +15,6 @@ import NFTCollectionTable from "../../components/NFTCollectionTable";
 import { getPrices } from "../../store/dexSlice";
 import { CTCINFO_LP_WVOI_VOI } from "../../contants/dex";
 import { ARC72_INDEXER_API } from "../../config/arc72-idx";
-import { getSmartTokens } from "../../store/smartTokenSlice";
-import {
-  useCollectionInfo,
-  useCollections,
-  useListings,
-  usePrices,
-  useSales,
-  useSmartTokens,
-  useTokens,
-} from "@/components/Navbar/hooks/collections";
-import { GridLoader } from "react-spinners";
 
 const SectionHeading = styled.div`
   display: flex;
@@ -80,117 +69,100 @@ const StyledLink = styled(Link)`
 `;
 
 export const Collections: React.FC = () => {
-  // !Replaced data fetching and state management with react-query hooks
-  const { data: collectionInfo } = useCollectionInfo();
-
+  /* Dispatch */
+  const dispatch = useDispatch();
   /* Dex */
-
-  // !Replaced data fetching and state management with react-query hooks
-  const { data: prices, status: dexStatus } = usePrices();
-
+  const prices = useSelector((state: RootState) => state.dex.prices);
+  const dexStatus = useSelector((state: RootState) => state.dex.status);
+  useEffect(() => {
+    dispatch(getPrices() as unknown as UnknownAction);
+  }, [dispatch]);
   const exchangeRate = useMemo(() => {
-    if (!prices || dexStatus !== "success") return 0;
+    if (!prices || dexStatus !== "succeeded") return 0;
     const voiPrice = prices.find((p) => p.contractId === CTCINFO_LP_WVOI_VOI);
     if (!voiPrice) return 0;
     return voiPrice.rate;
   }, [prices, dexStatus]);
-
   /* Tokens */
-  // !Replaced data fetching and state management with react-query hooks
-  const { data: tokens, status: tokenStatus ,error:tokenError} = useTokens();
+  const tokens = useSelector((state: any) => state.tokens.tokens);
+  const tokenStatus = useSelector((state: any) => state.tokens.status);
+  useEffect(() => {
+    dispatch(getTokens() as unknown as UnknownAction);
+  }, [dispatch]);
 
   /* Collections */
-  // !Replaced data fetching and state management with react-query hooks
-  const { data: collections, status: collectionStatus } = useCollections();
-
+  const collections = useSelector(
+    (state: any) => state.collections.collections
+  );
+  const collectionStatus = useSelector(
+    (state: any) => state.collections.status
+  );
+  useEffect(() => {
+    dispatch(getCollections() as unknown as UnknownAction);
+  }, [dispatch]);
   /* Sales */
-
-  // !Replaced data fetching and state management with react-query hooks
-  const { data: sales, status: salesStatus } = useSales();
-
-  /* Smart Tokens */
-
-  // !Replaced data fetching and state management with react-query hooks
-  const { data: smartTokens, status: smartTokenStatus } = useSmartTokens();
-
+  const sales = useSelector((state: any) => state.sales.sales);
+  const salesStatus = useSelector((state: any) => state.sales.status);
+  useEffect(() => {
+    dispatch(getSales() as unknown as UnknownAction);
+  }, [dispatch]);
   /* Theme */
   const isDarkTheme = useSelector(
     (state: RootState) => state.theme.isDarkTheme
   );
 
   /* NFT Navigator Listings */
-  // !Replaced data fetching and state management with react-query hooks
-  const { data: listings, status: listingsStatus } = useListings();
-
-
-
+  const [listings, setListings] = React.useState<any>(null);
+  React.useEffect(() => {
+    try {
+      const res = axios
+        .get(`${ARC72_INDEXER_API}/nft-indexer/v1/mp/listings`, {
+          params: {
+            active: true,
+          },
+        })
+        .then(({ data }) => {
+          setListings(data.listings);
+        });
+    } catch (e) {
+      console.log(e);
+    }
+  }, []);
 
   const rankings: any = useMemo(() => {
     if (
       !tokens ||
       !sales ||
       !listings ||
-      tokenStatus !== "success" ||
-      salesStatus !== "success" ||
-      collectionStatus !== "success"
+      tokenStatus !== "succeeded" ||
+      salesStatus !== "succeeded" ||
+      collectionStatus !== "succeeded"
     )
       return new Map();
-    return getRankings(tokens, collections, sales, listings, 1, smartTokens);
+    return getRankings(tokens, collections, sales, listings, exchangeRate);
   }, [sales, tokens, collections, listings]);
 
   const isLoading = useMemo(
     () =>
       !listings ||
       !rankings ||
-      tokenStatus !== "success" ||
-      collectionStatus !== "success" ||
-      salesStatus !== "success",
+      tokenStatus !== "succeeded" ||
+      collectionStatus !== "succeeded" ||
+      salesStatus !== "succeeded",
     [tokens, listings, rankings, tokenStatus, collectionStatus, salesStatus]
   );
 
-  if (!isLoading) {
-    return (
-      <Layout>
-        <Container maxWidth="xl">
-          <SectionHeading>
-            <SectionTitle className={isDarkTheme ? "dark" : "light"}>
-              Collections
-            </SectionTitle>
-            <SectionDescription>
-              // {rankings?.length} results
-            </SectionDescription>
-          </SectionHeading>
-          <NFTCollectionTable
-            rankings={rankings}
-            collectionInfo={collectionInfo}
-          />
-        </Container>
-      </Layout>
-    );
-  }
-
-  return (
+  return !isLoading ? (
     <Layout>
       <Container maxWidth="xl">
         <SectionHeading>
           <SectionTitle className={isDarkTheme ? "dark" : "light"}>
             Collections
           </SectionTitle>
-          {/* <SectionDescription>// {rankings?.length} results</SectionDescription> */}
+          <SectionDescription>// {rankings.length} results</SectionDescription>
         </SectionHeading>
-        <div className="w-full h-[max(70vh,20rem)]  flex items-center justify-center">
-          <GridLoader
-            size={30}
-            color={isDarkTheme ? "#fff" : "#000"}
-            className="sm:!hidden !text-primary "
-          />
-          <GridLoader
-            size={50}
-            color={isDarkTheme ? "#fff" : "#000"}
-            className="!hidden sm:!block !text-primary "
-          />
-        </div>
+        <NFTCollectionTable rankings={rankings} />
       </Container>
     </Layout>
-  );
+  ) : null;
 };

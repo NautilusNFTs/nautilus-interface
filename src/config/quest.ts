@@ -9,7 +9,6 @@ export enum QUEST_ACTION {
   TIMED_SALE_LIST_1MINUTE = "timed_sale_list_1minute",
   TIMED_SALE_LIST_15MINUTES = "timed_sale_list_15minutes",
   TIMED_SALE_LIST_1HOUR = "timed_sale_list_1hour",
-  NFT_TRANSFER = "nft_transfer",
 }
 
 export const getActions = (address: string) => {

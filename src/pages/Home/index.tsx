@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Layout from "../../layouts/Default";
-import { Box, Grid, Skeleton } from "@mui/material";
+import { Grid, Skeleton } from "@mui/material";
 import { Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "../../store/store";
@@ -11,7 +11,7 @@ import { Stack } from "@mui/material";
 import { getTokens } from "../../store/tokenSlice";
 import { UnknownAction } from "@reduxjs/toolkit";
 import { getCollections } from "../../store/collectionSlice";
-import { ListedToken, ListingI, NFTIndexerListingI, TokenI } from "../../types";
+import { ListedToken, ListingI, TokenI } from "../../types";
 import { getSales } from "../../store/saleSlice";
 import Marquee from "react-fast-marquee";
 import CartNftCard from "../../components/CartNFTCard";
@@ -19,11 +19,6 @@ import { getPrices } from "../../store/dexSlice";
 import { CTCINFO_LP_WVOI_VOI } from "../../contants/dex";
 import { getListings } from "../../store/listingSlice";
 import { getRankings } from "../../utils/mp";
-import { getSmartTokens } from "../../store/smartTokenSlice";
-import Grid2 from "@mui/material/Unstable_Grid2"; // Grid version 2
-import LazyLoad from "react-lazy-load";
-import axios from "axios";
-import { stripTrailingZeroBytes } from "@/utils/string";
 
 const ActivityFilterContainer = styled.div`
   display: flex;
@@ -90,16 +85,13 @@ const SectionTitle = styled.h2`
   text-edge: cap;
   font-feature-settings: "clig" off, "liga" off;
   font-family: Nohemi;
-  font-size: 36px;
+  font-size: 40px;
   font-style: normal;
   font-weight: 700;
   line-height: 100%; /* 40px */
-  @media (min-width: 620px) {
-    font-size: 40px;
-  }
 `;
 
-const SectionButtonContainer = styled(Box)`
+const SectionMoreButtonContainer = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
@@ -110,28 +102,24 @@ const SectionButtonContainer = styled(Box)`
   & button.button-dark {
     border: 1px solid #fff;
   }
-
+  & button.button-dark::after {
+    background: url("/arrow-narrow-up-right-dark.svg") no-repeat;
+  }
   & div.button-text-dark {
     color: #fff;
   }
   & button.button-light {
     border: 1px solid #93f;
   }
+  & button.button-light::after {
+    background: url("/arrow-narrow-up-right-light.svg") no-repeat;
+  }
   & div.button-text-light {
     color: #93f;
   }
 `;
 
-const SectionMoreButtonContainer = styled(SectionButtonContainer)`
-  & button.button-light::after {
-    background: url("/arrow-narrow-up-right-light.svg") no-repeat;
-  }
-  & button.button-dark::after {
-    background: url("/arrow-narrow-up-right-dark.svg") no-repeat;
-  }
-`;
-
-const SectionButton = styled.button`
+const SectionMoreButton = styled.button`
   /* Layout */
   display: flex;
   padding: 12px 20px;
@@ -144,8 +132,6 @@ const SectionButton = styled.button`
   box-shadow: 0px 1px 2px 0px rgba(16, 24, 40, 0.04);
   /* Style/Extra */
   background-color: transparent;
-`;
-const SectionMoreButton = styled(SectionButton)`
   &::after {
     content: "";
     width: 20px;
@@ -156,11 +142,12 @@ const SectionMoreButton = styled(SectionButton)`
 `;
 
 const SectionMoreButtonText = styled.div`
+  /* Text Button/Semibold Large */
   font-family: "Inter", sans-serif;
   font-size: 15px;
   font-style: normal;
   font-weight: 600;
-  line-height: 22px;
+  line-height: 22px; /* 146.667% */
   letter-spacing: 0.1px;
   cursor: pointer;
 `;
@@ -172,26 +159,22 @@ const SectionBanners = styled.div`
   margin-top: 45px;
 `;
 
-const pageSize = 12;
+function shuffleArray<T>(array: T[]): T[] {
+  // Create a copy of the original array to avoid mutating the original array
+  const shuffledArray = [...array];
+  for (let i = shuffledArray.length - 1; i > 0; i--) {
+    // Generate a random index between 0 and i
+    const randomIndex = Math.floor(Math.random() * (i + 1));
+    // Swap elements between randomIndex and i
+    [shuffledArray[i], shuffledArray[randomIndex]] = [
+      shuffledArray[randomIndex],
+      shuffledArray[i],
+    ];
+  }
+  return shuffledArray;
+}
 
 export const Home: React.FC = () => {
-  /* Collection Info */
-  // const [collectionInfo, setCollectionInfo] = React.useState<any>(null);
-  // useEffect(() => {
-  //   try {
-  //     axios
-  //       .get(`https://prod-voi.api.highforge.io/projects`)
-  //       .then((res: any) => res.data.results)
-  //       .then(setCollectionInfo);
-  //   } catch (e) {
-  //     console.log(e);
-  //   }
-  // }, []);
-  // console.log({ collectionInfo });
-
-  const [showing, setShowing] = useState<number>(pageSize);
-
-  /* Activity */
   const [activeFilter, setActiveFilter] = useState<string[]>(["all"]);
   const handleFilterClick = (value: string) => {
     if (value === "all") return setActiveFilter(["all"]);
@@ -208,77 +191,176 @@ export const Home: React.FC = () => {
 
   /* Dispatch */
   const dispatch = useDispatch();
-
-  /* Smart Tokens */
-  const smartTokens = useSelector((state: any) => state.smartTokens.tokens);
-  const smartTokenStatus = useSelector(
-    (state: any) => state.smartTokens.status
-  );
+  /* Dex */
+  const prices = useSelector((state: RootState) => state.dex.prices);
+  const dexStatus = useSelector((state: RootState) => state.dex.status);
   useEffect(() => {
-    if (smartTokenStatus === "succeeded") return;
-    dispatch(getSmartTokens() as unknown as UnknownAction);
-  }, []);
-
+    dispatch(getPrices() as unknown as UnknownAction);
+  }, [dispatch])
+  const exchangeRate = useMemo(() => {
+    // if (!prices || dexStatus !== "succeeded") return 0;
+    // const voiPrice = prices.find((p) => p.contractId === CTCINFO_LP_WVOI_VOI);
+    // if (!voiPrice) return 0;
+    // return voiPrice.rate;
+    return 1;
+  }, [prices, dexStatus]);
   /* Listings */
   const listings = useSelector((state: any) => state.listings.listings);
   const listingsStatus = useSelector((state: any) => state.listings.status);
   useEffect(() => {
-    if (listingsStatus === "succeeded") return;
     dispatch(getListings() as unknown as UnknownAction);
-  }, []);
+  }, [dispatch]);
+  /* Tokens */
+  const tokens = useSelector((state: any) => state.tokens.tokens);
+  const tokenStatus = useSelector((state: any) => state.tokens.status);
+  useEffect(() => {
+    dispatch(getTokens() as unknown as UnknownAction);
+  }, [dispatch]);
+  /* Collections */
+  const collections = useSelector(
+    (state: any) => state.collections.collections
+  );
+  const collectionStatus = useSelector(
+    (state: any) => state.collections.status
+  );
+  useEffect(() => {
+    dispatch(getCollections() as unknown as UnknownAction);
+  }, [dispatch]);
+  /* Sales */
+  const sales = useSelector((state: any) => state.sales.sales);
+  const salesStatus = useSelector((state: any) => state.sales.status);
+  useEffect(() => {
+    dispatch(getSales() as unknown as UnknownAction);
+  }, [dispatch]);
 
   /* Theme */
   const isDarkTheme = useSelector(
     (state: RootState) => state.theme.isDarkTheme
   );
 
-  /* Tokens */
-  // const tokens = useSelector((state: any) => state.tokens.tokens);
-  // const tokenStatus = useSelector((state: any) => state.tokens.status);
-  // useEffect(() => {
-  //   dispatch(getTokens() as unknown as UnknownAction);
-  // }, [dispatch]);
-  /* Sales */
-  // const sales = useSelector((state: any) => state.sales.sales);
-  // const salesStatus = useSelector((state: any) => state.sales.status);
-  // useEffect(() => {
-  //   dispatch(getSales() as unknown as UnknownAction);
-  // }, [dispatch]);
-  /* Collections */
-  // const collections = useSelector(
-  //   (state: any) => state.collections.collections
-  // );
-  // const collectionStatus = useSelector(
-  //   (state: any) => state.collections.status
-  // );
-  // useEffect(() => {
-  //   dispatch(getCollections() as unknown as UnknownAction);
-  // }, [dispatch]);
-
-  /* Rankings */
-  // const rankings: any = useMemo(() => {
-  //   if (
-  //     !tokens ||
-  //     !sales ||
-  //     !listings ||
-  //     tokenStatus !== "succeeded" ||
-  //     salesStatus !== "succeeded" ||
-  //     collectionStatus !== "succeeded"
-  //   )
-  //     return null;
-  //   return getRankings(tokens, collections, sales, listings, 1, smartTokens);
-  // }, [sales, tokens, collections, listings]);
-
+  /* Router */
   const navigate = useNavigate();
 
-  const isLoading = !listings || !smartTokens || listingsStatus !== "succeeded";
+  /* Toggle Buttons */
+  const [selectedOption, setSelectedOption] = useState<string | null>("all");
+
+  const handleOptionChange = (
+    event: React.MouseEvent<HTMLElement>,
+    newOption: string | null
+  ) => {
+    if (newOption !== null) {
+      setSelectedOption(newOption);
+    }
+  };
+
+  const listedNfts = useMemo(() => {
+    if (tokenStatus !== "succeeded") return [];
+    const listedNfts: ListedToken[] =
+      tokens
+        ?.filter((nft: TokenI) => {
+          return listings?.some(
+            (listing: ListingI) =>
+              `${listing.collectionId}` === `${nft.contractId}` &&
+              `${listing.tokenId}` === `${nft.tokenId}`
+          );
+        })
+        ?.map((nft: TokenI) => {
+          const listing = listings.find(
+            (l: ListingI) =>
+              `${l.collectionId}` === `${nft.contractId}` &&
+              `${l.tokenId}` === `${nft.tokenId}`
+          );
+          return {
+            ...nft,
+            listing,
+          };
+        }) || [];
+    listedNfts.sort(
+      (a: any, b: any) => b.listing.timestamp - a.listing.timestamp
+    );
+    // remove duplicates listings by collection
+    const seen: any = {};
+    const filteredListedNfts = listedNfts.filter((nft: any) => {
+      const key = `${nft.contractId}`;
+      if (seen[key]) {
+        return false;
+      }
+      seen[key] = true;
+      return true;
+    });
+    return filteredListedNfts;
+  }, [tokenStatus, tokens, listings]);
+
+  const listedCollections = useMemo(() => {
+    if (collectionStatus !== "succeeded") return [];
+    const listedCollections =
+      collections
+        ?.filter((c: any) => {
+          return listedNfts?.some(
+            (nft: any) => `${nft.contractId}` === `${c.contractId}`
+          );
+        })
+        .map((c: any) => {
+          return {
+            ...c,
+            tokens: listedNfts?.filter(
+              (nft: any) => `${nft.contractId}` === `${c.contractId}`
+            ),
+          };
+        }) || [];
+    listedCollections.sort(
+      (a: any, b: any) =>
+        b.tokens[0].listing.createTimestamp -
+        a.tokens[0].listing.createTimestamp
+    );
+    return listedCollections;
+  }, [collectionStatus, collections, listedNfts]);
+
+  const rankings: any = useMemo(() => {
+    if (
+      !sales ||
+      !listings ||
+      !exchangeRate ||
+      salesStatus !== "succeeded" ||
+      collectionStatus !== "succeeded" ||
+      tokenStatus !== "succeeded" ||
+      dexStatus !== "succeeded"
+    )
+      return new Map();
+    return getRankings(tokens, collections, sales, listings, exchangeRate);
+  }, [sales, tokens, collections, listings, exchangeRate]);
+
+  const isLoading = useMemo(
+    () =>
+      !exchangeRate ||
+      !listings ||
+      !listedNfts ||
+      !listedCollections ||
+      !rankings ||
+      listingsStatus !== "succeeded" ||
+      tokenStatus !== "succeeded" ||
+      collectionStatus !== "succeeded" ||
+      salesStatus !== "succeeded" ||
+      dexStatus !== "succeeded",
+    [
+      listings,
+      listedNfts,
+      listedCollections,
+      rankings,
+      exchangeRate,
+      tokenStatus,
+      collectionStatus,
+      salesStatus,
+      dexStatus,
+    ]
+  );
 
   return (
     <Layout>
       {!isLoading ? (
         <div>
-          <SectionHeading className="flex flex-col justify-items-start !items-start gap-2 sm:flex-row  mb-4 sm:mb-0">
-            <SectionTitle className={`${isDarkTheme ? "dark" : "light"} `}>
+          <SectionHeading>
+            <SectionTitle className={isDarkTheme ? "dark" : "light"}>
               New Listings
             </SectionTitle>
             <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
@@ -299,229 +381,150 @@ export const Home: React.FC = () => {
               </SectionMoreButtonContainer>
             </Stack>
           </SectionHeading>
-          {listings ? (
-            <>
-              <div className=" items-center flex flex-col sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 x sm:w-fit gap-4 sm:gap-2">
-                {listings.slice(0, showing).map((el: NFTIndexerListingI) => {
-                  const nft = {
-                    ...el.token,
-                    metadataURI: stripTrailingZeroBytes(
-                      el?.token?.metadataURI || ""
-                    ),
-                  };
-                  return (
-                    <Grid2 key={el.transactionId}>
+          {listedNfts ? (
+            <div
+              style={{
+                width: "100%",
+                overflowX: "hidden",
+              }}
+            >
+              <Marquee direction="left">
+                <Stack direction="row" spacing={2} sx={{ marginLeft: "16px" }}>
+                  {listedNfts.slice(0, 12).map((el: ListedToken) => {
+                    return (
                       <CartNftCard
-                        token={nft}
-                        listing={el}
-                        onClick={() => {
-                          navigate(
-                            `/collection/${el.token.contractId}/token/${el.token.tokenId}`
-                          );
-                        }}
+                        key={el.listing.transactionId}
+                        listedNft={el}
                       />
-                    </Grid2>
-                  );
-                })}
-                <Grid2>
-                  <SectionButtonContainer
-                    sx={{ height: "305px", width: "305px" }}
-                  >
-                    <SectionButton
-                      onClick={() => setShowing(showing + pageSize * 2)}
-                      className={isDarkTheme ? "button-dark" : "button-light"}
-                    >
-                      <SectionMoreButtonText
-                        className={
-                          isDarkTheme ? "button-text-dark" : "button-text-light"
-                        }
-                      >
-                        View More
-                      </SectionMoreButtonText>
-                    </SectionButton>
-                  </SectionButtonContainer>
-                </Grid2>
-              </div>
-              {/*
-                <SectionButtonContainer sx={{ mt: 5 }}>
-                  <SectionButton
-                    onClick={() => setShowing(showing + pageSize * 2)}
-                    className={isDarkTheme ? "button-dark" : "button-light"}
-                  >
+                    );
+                  })}
+                </Stack>
+              </Marquee>
+            </div>
+          ) : (
+            "No NFTs available for sale."
+          )}
+
+          {/* Top Collections */}
+          <SectionHeading>
+            <SectionTitle className={isDarkTheme ? "dark" : "light"}>
+              Top Collections
+            </SectionTitle>
+            <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+              <SectionMoreButtonContainer>
+                <SectionMoreButton
+                  className={isDarkTheme ? "button-dark" : "button-light"}
+                >
+                  <Link to="/collection">
                     <SectionMoreButtonText
                       className={
                         isDarkTheme ? "button-text-dark" : "button-text-light"
                       }
                     >
-                      View More
+                      View All
                     </SectionMoreButtonText>
-                  </SectionButton>
-                </SectionButtonContainer>
-                    */}
-            </>
-          ) : (
-            <div>"No NFTs available for sale."</div>
-          )}
-
-          {/* Top Collections */}
-          {/*true ? (
-            <>
-              <SectionHeading>
-                <SectionTitle className={isDarkTheme ? "dark" : "light"}>
-                  Top Collections
-                </SectionTitle>
-                <Stack
-                  direction="row"
-                  spacing={2}
-                  sx={{ alignItems: "center" }}
-                >
-                  <SectionMoreButtonContainer>
-                    <SectionMoreButton
-                      className={isDarkTheme ? "button-dark" : "button-light"}
-                    >
-                      <Link to="/collection">
-                        <SectionMoreButtonText
-                          className={
-                            isDarkTheme
-                              ? "button-text-dark"
-                              : "button-text-light"
-                          }
-                        >
-                          View All
-                        </SectionMoreButtonText>
-                      </Link>
-                    </SectionMoreButton>
-                  </SectionMoreButtonContainer>
-                </Stack>
-              </SectionHeading>
-              {rankings ? (
-                <RankingList
-                  rankings={rankings}
-                  selectedOption="all"
-                  collectionInfo={collectionInfo}
-                />
-              ) : (
-                "Loading..."
-              )}
-            </>
-              ) : null*/}
+                  </Link>
+                </SectionMoreButton>
+              </SectionMoreButtonContainer>
+            </Stack>
+          </SectionHeading>
+          <RankingList rankings={rankings} selectedOption={selectedOption} />
           {/* Activity */}
-          {/*true ? (
-            <>
-              <SectionHeading>
-                <Stack
-                  direction="row"
-                  spacing={2}
-                  sx={{ alignItems: "center" }}
+          <SectionHeading>
+            <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+              <SectionTitle className={isDarkTheme ? "dark" : "light"}>
+                Activity
+              </SectionTitle>
+              <ActivityFilterContainer>
+                {[
+                  {
+                    label: "All",
+                    value: "all",
+                  },
+                  {
+                    label: "Listing",
+                    value: "listing",
+                  },
+                  {
+                    label: "Sale",
+                    value: "sale",
+                  },
+                ].map((filter) => {
+                  if (activeFilter.includes(filter.value)) {
+                    return (
+                      <ActiveFilter
+                        onClick={() => handleFilterClick(filter.value)}
+                      >
+                        <ActiveFilterLabel>{filter.label}</ActiveFilterLabel>
+                      </ActiveFilter>
+                    );
+                  }
+                  return (
+                    <Filter onClick={() => handleFilterClick(filter.value)}>
+                      <FilterLabel>{filter.label}</FilterLabel>
+                    </Filter>
+                  );
+                })}
+              </ActivityFilterContainer>
+            </Stack>
+            <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+              <SectionMoreButtonContainer>
+                <SectionMoreButton
+                  className={isDarkTheme ? "button-dark" : "button-light"}
                 >
-                  <SectionTitle className={isDarkTheme ? "dark" : "light"}>
-                    Activity
-                  </SectionTitle>
-                  {<ActivityFilterContainer>
-                    {[
-                      {
-                        label: "All",
-                        value: "all",
-                      },
-                      {
-                        label: "Listing",
-                        value: "listing",
-                      },
-                      {
-                        label: "Sale",
-                        value: "sale",
-                      },
-                    ].map((filter) => {
-                      if (activeFilter.includes(filter.value)) {
-                        return (
-                          <ActiveFilter
-                            onClick={() => handleFilterClick(filter.value)}
-                          >
-                            <ActiveFilterLabel>
-                              {filter.label}
-                            </ActiveFilterLabel>
-                          </ActiveFilter>
-                        );
+                  <Link to="/activity">
+                    <SectionMoreButtonText
+                      className={
+                        isDarkTheme ? "button-text-dark" : "button-text-light"
                       }
-                      return (
-                        <Filter onClick={() => handleFilterClick(filter.value)}>
-                          <FilterLabel>{filter.label}</FilterLabel>
-                        </Filter>
-                      );
-                    })}
-                  </ActivityFilterContainer>}
-                </Stack>
-                <Stack
-                  direction="row"
-                  spacing={2}
-                  sx={{ alignItems: "center" }}
-                >
-                  {<SectionMoreButtonContainer>
-                    <SectionMoreButton
-                      className={isDarkTheme ? "button-dark" : "button-light"}
                     >
-                      <Link to="/activity">
-                        <SectionMoreButtonText
-                          className={
-                            isDarkTheme
-                              ? "button-text-dark"
-                              : "button-text-light"
-                          }
-                        >
-                          View All
-                        </SectionMoreButtonText>
-                      </Link>
-                    </SectionMoreButton>
-                        </SectionMoreButtonContainer>}
-                </Stack>
-              </SectionHeading>
-              {
-                <NFTSaleActivityTable
-                  sales={sales}
-                  tokens={tokens}
-                  collections={collections}
-                  listings={listings}
-                  activeFilter={activeFilter}
-                  limit={10}
-                />
-              }
-            </>
-            ) : null*/}
+                      View All
+                    </SectionMoreButtonText>
+                  </Link>
+                </SectionMoreButton>
+              </SectionMoreButtonContainer>
+            </Stack>
+          </SectionHeading>
+          <NFTSaleActivityTable
+            sales={sales}
+            tokens={tokens}
+            collections={collections}
+            listings={listings}
+            activeFilter={activeFilter}
+            limit={10}
+          />
+
           {/* Banners */}
-          {false ? (
-            <>
-              <SectionBanners>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <Link to="https://nftnavigator.xyz/" target="_blank">
-                      <img
-                        style={{
-                          width: "100%",
-                          cursor: "pointer",
-                          borderRadius: 10,
-                        }}
-                        src="/img/banner-nft-navigator.png"
-                        alt="VOI NFT Navigator Banner"
-                      />
-                    </Link>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Link to="https://highforge.io/" target="_blank">
-                      <img
-                        style={{
-                          width: "100%",
-                          cursor: "pointer",
-                          borderRadius: 10,
-                        }}
-                        src="/img/banner-high-forge.png"
-                        alt="High Forge Banner"
-                      />
-                    </Link>
-                  </Grid>
-                </Grid>
-              </SectionBanners>
-            </>
-          ) : null}
+          <SectionBanners>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <Link to="https://nftnavigator.xyz/" target="_blank">
+                  <img
+                    style={{
+                      width: "100%",
+                      cursor: "pointer",
+                      borderRadius: 10,
+                    }}
+                    src="/img/banner-nft-navigator.png"
+                    alt="VOI NFT Navigator Banner"
+                  />
+                </Link>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Link to="https://highforge.io/" target="_blank">
+                  <img
+                    style={{
+                      width: "100%",
+                      cursor: "pointer",
+                      borderRadius: 10,
+                    }}
+                    src="/img/banner-high-forge.png"
+                    alt="High Forge Banner"
+                  />
+                </Link>
+              </Grid>
+            </Grid>
+          </SectionBanners>
         </div>
       ) : (
         <div>

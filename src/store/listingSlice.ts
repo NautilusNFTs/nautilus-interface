@@ -12,31 +12,27 @@ export interface ListingsState {
   error: string | null;
 }
 
-const blacklistContracts: number[] = [];
-
 export const getListings = createAsyncThunk<
   ListingI[],
   void,
   { rejectValue: string; state: RootState }
 >("listings/getListings", async (_, { getState, rejectWithValue }) => {
   try {
-    //const listingTable = db.table("listings");
-    //const listings = await listingTable.toArray();
-    const lastRound = 0;
-    // const lastRound =
-    //   listings.length > 0
-    //     ? Math.max(...listings.map((listing: ListingI) => listing.round))
-    //     : 0;
+    const listingTable = db.table("listings");
+    const listings = await listingTable.toArray();
+    const lastRound =
+      listings.length > 0
+        ? Math.max(...listings.map((listing: ListingI) => listing.round))
+        : 0;
     const response = await axios.get(
       `${ARC72_INDEXER_API}/nft-indexer/v1/mp/listings`,
       {
         params: {
-          //"min-round": lastRound,
+          "min-round": lastRound,
           active: true,
         },
       }
     );
-    /*
     const response2 = await axios.get(
       `${ARC72_INDEXER_API}/nft-indexer/v1/mp/deletes`,
       {
@@ -53,15 +49,11 @@ export const getListings = createAsyncThunk<
         },
       }
     );
-    */
 
     const newlistings = response.data.listings.filter(
-      (listing: NFTIndexerListingI) =>
-        listing.createRound > lastRound &&
-        !blacklistContracts.includes(listing.collectionId)
+      (listing: NFTIndexerListingI) => listing.createRound > lastRound
     );
 
-    /*
     const deletedListingsToDelete = response2.data.deletes
       .filter((deleted: any) => deleted.round > lastRound)
       .map((deleted: any) => `${deleted.mpContractId}-${deleted.mpListingId}`);
@@ -69,7 +61,6 @@ export const getListings = createAsyncThunk<
     const soldListingsToDelete = response3.data.sales
       .filter((sale: any) => sale.round > lastRound)
       .map((sale: any) => `${sale.mpContractId}-${sale.mpListingId}`);
-      */
 
     await db.table("listings").bulkPut(
       newlistings.map((listing: NFTIndexerListingI) => {
@@ -90,30 +81,12 @@ export const getListings = createAsyncThunk<
       })
     );
 
-    await db.table("tokens").bulkPut(
-      newlistings.map((listing: NFTIndexerListingI) => {
-        return {
-          pk: `${listing.token.contractId}-${listing.token.tokenId}`,
-          owner: listing.token.owner,
-          approved: listing.token.approved,
-          tokenId: listing.token.tokenId,
-          contractId: listing.token.contractId,
-          mintRound: listing.token.mintRound,
-          metadataURI: listing?.token?.metadataURI || "",
-          metadata: listing.token?.metadata,
-        };
-      })
-    );
+    await db.table("listings").bulkDelete(soldListingsToDelete);
+    await db.table("listings").bulkDelete(deletedListingsToDelete);
 
-    //await db.table("listings").bulkDelete(soldListingsToDelete);
-    //await db.table("listings").bulkDelete(deletedListingsToDelete);
-
-    return [
-      //...listings,
-      ...newlistings,
-    ]
-      .reverse()
-      .map((listing: any) => listing) as ListingI[];
+    return [...listings, ...newlistings].map(
+      (listing: any) => listing
+    ) as ListingI[];
   } catch (error: any) {
     return rejectWithValue(error.message);
   }
