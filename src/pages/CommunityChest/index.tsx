@@ -377,6 +377,101 @@ interface ApiResponse {
   snapshots: EpochSummary[];
 }
 
+// Add this interface near the top with other interfaces
+interface Notification {
+  date: string;
+  message: string;
+  type: "info" | "warning" | "success";
+}
+
+// Update the NotificationSection styled component
+const NotificationSection = styled(Box)<{ $isDarkTheme: boolean }>`
+  margin: 64px 0 48px;
+  padding: 16px;
+  background-color: ${(props) =>
+    props.$isDarkTheme ? "rgba(0, 0, 0, 0.4)" : "rgba(255, 255, 255, 0.1)"};
+  border-radius: 12px;
+  border: 1px solid
+    ${(props) =>
+      props.$isDarkTheme ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"};
+`;
+
+const NotificationItem = styled(Box)<{ $isDarkTheme: boolean; $type: string }>`
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  background-color: ${(props) => {
+    const alpha = props.$isDarkTheme ? "0.2" : "0.1";
+    switch (props.$type) {
+      case "info":
+        return props.$isDarkTheme
+          ? `rgba(33, 150, 243, ${alpha})`
+          : `rgba(33, 150, 243, ${alpha})`;
+      case "warning":
+        return props.$isDarkTheme
+          ? `rgba(255, 152, 0, ${alpha})`
+          : `rgba(255, 152, 0, ${alpha})`;
+      case "success":
+        return props.$isDarkTheme
+          ? `rgba(76, 175, 80, ${alpha})`
+          : `rgba(76, 175, 80, ${alpha})`;
+      default:
+        return "transparent";
+    }
+  }};
+  border-left: 4px solid
+    ${(props) => {
+      switch (props.$type) {
+        case "info":
+          return "#2196f3";
+        case "warning":
+          return "#ff9800";
+        case "success":
+          return "#4caf50";
+        default:
+          return "transparent";
+      }
+    }};
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+`;
+
+// Add this constant with the notifications data
+const notifications: Notification[] = [
+  {
+    date: "2024-11-14",
+    message:
+      "Update: Weekly rewards now available to CCV holder according to reward distribution",
+    type: "info",
+  },
+  {
+    date: "2024-11-13",
+    message:
+      "Community Chest v1.0 launched no-loss lottery with Community Chest Voi (CCV)",
+    type: "success",
+  },
+
+  /*
+  {
+    date: "2024-03-20",
+    message: "Community Chest v2.0 launched with improved reward distribution system",
+    type: "success"
+  },
+  {
+    date: "2024-03-15",
+    message: "Upcoming maintenance scheduled for March 25th. Service may be temporarily unavailable.",
+    type: "warning"
+  },
+  {
+    date: "2024-03-10",
+    message: "New feature: Weekly rewards now automatically distributed to participants",
+    type: "info"
+  }
+  */
+];
+
 const CommunityChest: React.FC<CommunityChestProps> = ({
   isDarkTheme,
   connected,
@@ -701,6 +796,15 @@ const CommunityChest: React.FC<CommunityChestProps> = ({
     return () => clearInterval(interval);
   }, [epochSummaries]);
 
+  // Inside the CommunityChest component, add this helper function
+  const formatNotificationDate = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
   return (
     <Layout>
       <Container $isDarkTheme={isDarkTheme}>
@@ -740,6 +844,51 @@ const CommunityChest: React.FC<CommunityChestProps> = ({
             Learn how it works →
           </Link>
         </StorySection>
+
+        {/* Add the notification section here */}
+        <NotificationSection $isDarkTheme={isDarkTheme}>
+          <Label $isDarkTheme={isDarkTheme} style={{ marginBottom: "16px" }}>
+            Notifications
+          </Label>
+          {notifications.slice(0, 3).map((notification, index) => (
+            <NotificationItem
+              key={index}
+              $isDarkTheme={isDarkTheme}
+              $type={notification.type}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: isDarkTheme
+                      ? "rgba(255, 255, 255, 0.9)"
+                      : "rgba(0, 0, 0, 0.9)",
+                    fontWeight: 500,
+                  }}
+                >
+                  {notification.message}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: isDarkTheme
+                      ? "rgba(255, 255, 255, 0.6)"
+                      : "rgba(0, 0, 0, 0.6)",
+                    ml: 2,
+                  }}
+                >
+                  {formatNotificationDate(notification.date)}
+                </Typography>
+              </Box>
+            </NotificationItem>
+          ))}
+        </NotificationSection>
 
         <StatsCard
           style={{

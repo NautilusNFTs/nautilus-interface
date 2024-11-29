@@ -236,20 +236,16 @@ const BuySaleModal: React.FC<BuySaleModalProps> = ({
   useEffect(() => {
     const fetchTokenMetadata = async () => {
       try {
-        const response = await fetch(
-          `https://mainnet-idx.nautilus.sh/nft-indexer/v1/nfts?contractId=${token.contractId}&tokenId=${token.tokenId}`
+        const { data } = await axios.get(
+          `https://mainnet-idx.nautilus.sh/nft-indexer/v1/tokens?contractId=${token.contractId}&tokenId=${token.tokenId}`
         );
-        if (response.ok) {
-          const data = await response.json();
-          if (data.nfts?.[0]?.metadata) {
-            setTokenMetadata(data.nfts[0].metadata);
-          }
+        if (data.tokens?.[0]?.metadata) {
+          setTokenMetadata(data.tokens[0].metadata);
         }
       } catch (error) {
         console.error("Error fetching token metadata:", error);
       }
     };
-
     if (token.contractId && token.tokenId) {
       fetchTokenMetadata();
     }
