@@ -16,28 +16,36 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import Pagination from "@/components/Pagination";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import { toast } from "react-toastify";
 import VIAIcon from "/src/static/crypto-icons/voi/6779767.svg";
 import moment from "moment";
 import { Link } from "react-router-dom";
 import BuySaleModal from "@/components/modals/BuySaleModal2";
+import MarketTableRow from "./MarketTableRow";
 
 interface MarketTableProps {
   marketData: any[]; // Replace 'any' with a more specific type if available
 }
 
-type SortDirection = 'asc' | 'desc' | null;
-type SortColumn = 'totalStaked' | 'lockup' | 'vesting' | 'unlock' | 'discount' | 'price' | null;
+type SortDirection = "asc" | "desc" | null;
+type SortColumn =
+  | "totalStaked"
+  | "lockup"
+  | "vesting"
+  | "unlock"
+  | "discount"
+  | "price"
+  | null;
 
 const MarketTable: React.FC<MarketTableProps> = ({ marketData }) => {
   const { isDarkTheme } = useSelector((state: RootState) => state.theme);
   const theme = useTheme();
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [sortColumn, setSortColumn] = useState<SortColumn>('discount');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [sortColumn, setSortColumn] = useState<SortColumn>("discount");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const tableStyle = {
     backgroundColor: "transparent",
@@ -86,15 +94,15 @@ const MarketTable: React.FC<MarketTableProps> = ({ marketData }) => {
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
-      if (sortDirection === 'asc') {
-        setSortDirection('desc');
-      } else if (sortDirection === 'desc') {
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else if (sortDirection === "desc") {
         setSortDirection(null);
         setSortColumn(null);
       }
     } else {
       setSortColumn(column);
-      setSortDirection('asc');
+      setSortDirection("asc");
     }
   };
 
@@ -106,18 +114,18 @@ const MarketTable: React.FC<MarketTableProps> = ({ marketData }) => {
       let bValue: any = b[sortColumn];
 
       // Special handling for specific columns
-      if (sortColumn === 'unlock') {
+      if (sortColumn === "unlock") {
         aValue = moment.unix(a.unlock).valueOf();
         bValue = moment.unix(b.unlock).valueOf();
-      } else if (sortColumn === 'discount') {
+      } else if (sortColumn === "discount") {
         aValue = parseFloat(a.discount);
         bValue = parseFloat(b.discount);
-      } else if (sortColumn === 'totalStaked' || sortColumn === 'price') {
+      } else if (sortColumn === "totalStaked" || sortColumn === "price") {
         aValue = Number(a[sortColumn]);
         bValue = Number(b[sortColumn]);
       }
 
-      if (sortDirection === 'asc') {
+      if (sortDirection === "asc") {
         return aValue > bValue ? 1 : -1;
       } else {
         return bValue > aValue ? 1 : -1;
@@ -125,21 +133,28 @@ const MarketTable: React.FC<MarketTableProps> = ({ marketData }) => {
     });
   }, [marketData, sortColumn, sortDirection]);
 
-  const SortableHeader: React.FC<{ column: SortColumn; children: React.ReactNode }> = ({ column, children }) => (
+  const SortableHeader: React.FC<{
+    column: SortColumn;
+    children: React.ReactNode;
+  }> = ({ column, children }) => (
     <Box
       component="span"
       sx={{
-        display: 'flex',
-        alignItems: 'center',
-        cursor: 'pointer',
-        '&:hover': { opacity: 0.8 },
+        display: "flex",
+        alignItems: "center",
+        cursor: "pointer",
+        "&:hover": { opacity: 0.8 },
       }}
       onClick={() => handleSort(column)}
     >
       {children}
       {sortColumn === column && (
         <Box component="span" sx={{ ml: 1 }}>
-          {sortDirection === 'asc' ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />}
+          {sortDirection === "asc" ? (
+            <ArrowUpwardIcon fontSize="small" />
+          ) : (
+            <ArrowDownwardIcon fontSize="small" />
+          )}
         </Box>
       )}
     </Box>
@@ -163,130 +178,35 @@ const MarketTable: React.FC<MarketTableProps> = ({ marketData }) => {
                 </SortableHeader>
               </TableCell>
               <TableCell style={headCellStyle} align="right">
-                <SortableHeader column="lockup">
-                  Lockup
-                </SortableHeader>
+                <SortableHeader column="lockup">Lockup</SortableHeader>
               </TableCell>
               <TableCell style={headCellStyle} align="right">
-                <SortableHeader column="vesting">
-                  Vesting
-                </SortableHeader>
+                <SortableHeader column="vesting">Vesting</SortableHeader>
               </TableCell>
               <TableCell style={headCellStyle} align="right">
-                <SortableHeader column="unlock">
-                  Unlock
-                </SortableHeader>
+                <SortableHeader column="unlock">Unlock</SortableHeader>
               </TableCell>
               <TableCell style={headCellStyle} align="right">
-                <SortableHeader column="discount">
-                  Discount
-                </SortableHeader>
+                <SortableHeader column="discount">Discount</SortableHeader>
               </TableCell>
               <TableCell style={headCellStyle} align="right">
-                <SortableHeader column="price">
-                  Price
-                </SortableHeader>
+                <SortableHeader column="price">Price</SortableHeader>
               </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {sortedData
-              .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+              .slice(
+                (currentPage - 1) * itemsPerPage,
+                currentPage * itemsPerPage
+              )
               .map((item) => (
-                <TableRow key={item.contractId}>
-                  <TableCell style={cellStyle} align="center">
-                    <Link
-                      to={`/collection/${item.token.contractId}/token/${item.token.tokenId}`}
-                    >
-                      {item.token.contractId}
-                    </Link>
-                    <ContentCopyIcon
-                      style={{
-                        cursor: "pointer",
-                        marginLeft: "5px",
-                        fontSize: "16px",
-                        color: "inherit",
-                      }}
-                      onClick={() =>
-                        copyToClipboard(
-                          item.token.contractId,
-                          "Account Address"
-                        )
-                      }
-                    />
-                  </TableCell>
-                  <TableCell style={cellStyle} align="center">
-                    <a
-                      href={`https://block.voi.network/explorer/account/${item.contractAddress}/transactions`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ color: "inherit" }}
-                    >
-                      {item.contractAddress.slice(0, 10)}...
-                      {item.contractAddress.slice(-10)}
-                    </a>
-                    <ContentCopyIcon
-                      style={{
-                        cursor: "pointer",
-                        marginLeft: "5px",
-                        fontSize: "16px",
-                        color: "inherit",
-                      }}
-                      onClick={() =>
-                        copyToClipboard(item.contractAddress, "Account Address")
-                      }
-                    />
-                  </TableCell>
-                  <TableCell style={cellStyle} align="right">
-                    {item.totalStaked / 1e6} VOI
-                  </TableCell>
-                  <TableCell style={cellStyle} align="right">
-                    {item.lockup}
-                  </TableCell>
-                  <TableCell style={cellStyle} align="right">
-                    {item.vesting}
-                  </TableCell>
-                  <TableCell style={cellStyle} align="right">
-                    {moment.unix(item.unlock).fromNow()}
-                  </TableCell>
-                  <TableCell
-                    style={{
-                      ...cellStyle,
-                      color: item.discount.indexOf("-") === 0 ? "red" : "green",
-                      fontWeight: 900,
-                    }}
-                    align="right"
-                  >
-                    {item.discount}%
-                  </TableCell>
-                  <TableCell style={cellStyle} align="right">
-                    <Button
-                      sx={{
-                        borderRadius: "20px",
-                        color: "inherit",
-                      }}
-                      variant={isDarkTheme ? "outlined" : "contained"}
-                      size="small"
-                      onClick={() => handleOpenModal(item)}
-                    >
-                      <img
-                        src={VIAIcon}
-                        style={{ height: "12px" }}
-                        alt="VOI Icon"
-                      />
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          ml: 1,
-                          color: "white",
-                          fontWeight: 500,
-                        }}
-                      >
-                        {item.price / 1e6} VOI
-                      </Typography>
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                <MarketTableRow
+                  key={item.contractId}
+                  item={item}
+                  isDarkTheme={isDarkTheme}
+                  onOpenModal={handleOpenModal}
+                />
               ))}
           </TableBody>
         </Table>

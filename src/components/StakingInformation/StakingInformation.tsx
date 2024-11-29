@@ -1,14 +1,14 @@
-import React, { FC, useEffect } from "react";
+import React, { FC } from "react";
 import { useStakingContract } from "@/hooks/staking";
-import { Box, Typography } from "@mui/material";
+import { Box, Typography, Skeleton } from "@mui/material";
 import { formatter } from "@/utils/number";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import humanizeDuration from "humanize-duration";
 import { AIRDROP_FUNDING } from "@/contants/staking";
 import moment from "moment";
-import {} from "@/utils/staking";
-import { getAlgorandClients } from "@/wallets";
+import { useAccountBalance } from "@/hooks/useAccountBalance";
+import algosdk from "algosdk";
 
 interface StakingInformationProps {
   contractId: number;
@@ -23,6 +23,31 @@ const StakingInformation: FC<StakingInformationProps> = ({ contractId }) => {
       includeWithdrawable: true,
     }
   );
+
+  const { balance, isLoading: loadingBalance, error: balanceError } = useAccountBalance(
+    algosdk.getApplicationAddress(contractId)
+  );
+
+  const renderBalance = () => {
+    if (loadingBalance) {
+      return (
+        <Skeleton
+          variant="text"
+          width={120}
+          height={24}
+          sx={{
+            bgcolor: isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+          }}
+        />
+      );
+    }
+
+    if (balanceError) {
+      return account.global_total / 1e6;
+    }
+
+    return balance ? balance / 1e6 : account.global_total / 1e6;
+  };
 
   return !loadingAccountData ? (
     <Box>
@@ -75,7 +100,7 @@ const StakingInformation: FC<StakingInformationProps> = ({ contractId }) => {
         <strong>Initial:</strong> {account.global_initial / 1e6} VOI
       </Typography>
       <Typography variant="body2">
-        <strong>Total:</strong> {account.global_total / 1e6} VOI
+        <strong>Total:</strong> {renderBalance()} VOI
       </Typography>
 
       {moment().unix() < AIRDROP_FUNDING ? (
@@ -89,7 +114,7 @@ const StakingInformation: FC<StakingInformationProps> = ({ contractId }) => {
           <Typography variant="body2">
             <strong>Est. Total Tokens:</strong>
             {` `}
-            {formatter.format(account.total || account.global_total)} VOI
+            {formatter.format(balance ? balance : account.global_total / 1e6)} VOI
           </Typography>
         </>
       ) : null}
