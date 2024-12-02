@@ -268,7 +268,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
   loading,
   exchangeRate,
 }) => {
-  console.log({ nft, collection, collectionInfo, loading, exchangeRate });
 
   /* Wallet */
   const { activeAccount, signTransactions } = useWallet();
@@ -347,7 +346,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
       await algodClient.sendRawTransaction(stxns as Uint8Array[]).do();
       toast.success("Unlist successful!");
     } catch (e: any) {
-      console.log(e);
       toast.error(e.message);
     } finally {
     }
@@ -631,8 +629,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
         // -----------------------------------------
         const customR = await ci.custom();
 
-        console.log({ customR });
-
         if (!customR.success) {
           throw new Error("failed in simulate");
         }
@@ -738,7 +734,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
           const addrs = [];
           for (const addr of candidates) {
             const hasBalanceR = await ciArc200.hasBalance(addr);
-            console.log({ addr, hasBalanceR });
 
             if (!hasBalanceR.success) {
               throw new Error("hasBalance failed in simulate");
@@ -764,8 +759,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
             ci.setPaymentAmount(28500);
             ci.setExtraTxns(customTxns);
             const customR = await ci.custom();
-
-            console.log({ customR });
 
             if (!customR.success) {
               throw new Error("failed in simulate");
@@ -840,8 +833,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
           customPaymentAmount.reduce((acc, val) => acc + val, 0)
         );
         const customR = await ci.custom();
-
-        console.log({ customR });
 
         if (!customR.success) {
           throw new Error("failed in simulate");
@@ -1538,7 +1529,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
       //   //  throw new Error("Unsupported currency!");
       //   //}
       // }
-      console.log(nft.listing);
       setOpenBuyModal(true);
     } catch (e: any) {
       console.log(e);
@@ -1549,7 +1539,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
   const currency = smartTokens?.find(
     (el: TokenType) => `${el.contractId}` === `${nft.listing?.currency}`
   );
-  console.log({ currency, smartTokens, nft });
   const currencySymbol =
     currency?.tokenId === "0" ? "VOI" : currency?.symbol || "VOI";
   const currencyDecimals =
@@ -1559,8 +1548,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
   );
   const price = formatter.format(priceBn.toNumber());
   const priceAU = new BigNumber(nft.listing?.price).toFixed(0);
-
-  console.log({ currency, currencySymbol, currencyDecimals, price, nft });
 
   const displayImage =
     (nft.metadata?.image || "").indexOf("ipfs://") >= 0
@@ -1584,7 +1571,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
     if (!nft) return;
     const ci = new arc72(nft.contractId, algodClient, indexerClient);
     ci.arc72_ownerOf(nft.tokenId).then((res: any) => {
-      console.log({ res });
       if (res.success) {
         setOwner(res.returnValue);
       }

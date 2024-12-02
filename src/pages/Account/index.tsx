@@ -291,6 +291,8 @@ export const Account: React.FC = () => {
     return listedNfts;
   }, [nfts, listings]);
 
+  console.log({ listedNfts });
+
   const listedCollections = useMemo(() => {
     const listedCollections =
       collections
@@ -1251,14 +1253,18 @@ export const Account: React.FC = () => {
           true
         ),
       };
-      const nftsToUnlist = selected2.map((i) => listedNfts[i]);
+      const nftsToUnlist = selected2.map((i) => ({
+        ...filteredListings[i],
+      }));
+      console.log({ nftsToUnlist });
       const buildN = [];
       for (const nft of nftsToUnlist) {
+        console.log({ nft });
+        const mpListingId = nft.mpListingId || nft.listing.mpListingId;
         buildN.push({
-          ...(await builder.mp.a_sale_deleteListing(nft.listing.mpListingId))
-            .obj,
+          ...(await builder.mp.a_sale_deleteListing(mpListingId)).obj,
           note: new TextEncoder().encode(
-            `a_sale_deleteListing listId: ${nft.listing.mpListingId}`
+            `a_sale_deleteListing listId: ${mpListingId}`
           ),
         });
       }
