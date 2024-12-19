@@ -469,8 +469,9 @@ export const Token: React.FC = () => {
           sk: new Uint8Array(0),
         },
       });
-      const arc72_ownerOfR = await ciARC72.arc72_ownerOf(Number(tid));
-      const arc72_getApprovedR = await ciARC72.arc72_getApproved(Number(tid));
+      const arc72_ownerOfR = await ciARC72.arc72_ownerOf(BigInt(tid));
+      const arc72_getApprovedR = await ciARC72.arc72_getApproved(BigInt(tid));
+      console.log({ arc72_ownerOfR, arc72_getApprovedR });
       if (!arc72_ownerOfR.success) throw new Error("Failed to get owner");
       if (!arc72_getApprovedR.success)
         throw new Error("Failed to get approved");
@@ -635,6 +636,7 @@ export const Token: React.FC = () => {
         <Container sx={{ pt: 5 }} maxWidth="xl">
           <Stack style={{ gap: "64px" }}>
             <NFTInfo
+              collectionName={nft?.collectionName}
               nft={nft}
               collection={collection}
               collectionInfo={collectionInfo}

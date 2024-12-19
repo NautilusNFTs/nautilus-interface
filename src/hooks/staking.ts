@@ -58,7 +58,7 @@ interface useStakingContractOpts {
   includeWithdrawable?: boolean;
 }
 export const useStakingContract = (
-  contractId: number,
+  contractId: string,
   opts?: useStakingContractOpts
 ) => {
   return useQuery({

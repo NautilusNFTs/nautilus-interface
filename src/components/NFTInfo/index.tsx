@@ -32,9 +32,8 @@ import ViaIcon from "/src/static/crypto-icons/voi/6779767.svg";
 import XIcon from "/src/static/icon/icon-x.svg";
 import DiscordIcon from "/src/static/icon/icon-discord.svg";
 import LinkIcon from "/src/static/icon/icon-link.svg";
-import NFTTabs from "../../components/NFTTabs";
 import ListSaleModal from "../modals/ListSaleModal";
-import { QUEST_ACTION, getActions, submitAction } from "../../config/quest";
+//import { QUEST_ACTION, getActions, submitAction } from "../../config/quest";
 import { getSmartTokens } from "../../store/smartTokenSlice";
 import { UnknownAction } from "@reduxjs/toolkit";
 import { NFTIndexerListingI, TokenType } from "../../types";
@@ -259,6 +258,7 @@ interface NFTInfoProps {
   collectionInfo: any;
   loading: boolean;
   exchangeRate: number;
+  collectionName?: string;
 }
 
 export const NFTInfo: React.FC<NFTInfoProps> = ({
@@ -267,8 +267,8 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
   collectionInfo,
   loading,
   exchangeRate,
+  collectionName,
 }) => {
-
   /* Wallet */
   const { activeAccount, signTransactions } = useWallet();
   /* Modal */
@@ -1286,12 +1286,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
     );
   }, [activeAccount, manager, nft.listing]);
 
-  const {
-    data: accInfo,
-    isLoading: isBalanceLoading,
-    refetch: refetchBalance,
-  } = useAccountInfo();
-
   const { data: stakingAccountData, isLoading: isLoadingStakingAccountData } =
     useStakingContract(nft.tokenId);
 
@@ -1562,9 +1556,10 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
         )}`
       : collection[0]?.metadata?.image;
 
-  const displayName = (nft.metadata?.name || "").match(/[0-9]/)
-    ? nft.metadata?.name
-    : nft.metadata?.name + " #" + nft.tokenId;
+  const displayName =
+    nft?.collectionName || (nft.metadata?.name || "").match(/[0-9]/)
+      ? nft.metadata?.name
+      : nft.metadata?.name + " #" + nft.tokenId;
 
   const [owner, setOwner] = useState<string | undefined>(nft.owner);
   useEffect(() => {
@@ -1650,7 +1645,8 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
                       navigate(`/collection/${nft.contractId}`);
                     }}
                   >
-                    {collectionInfo?.project?.title ||
+                    {nft?.collectionName ||
+                      collectionInfo?.project?.title ||
                       nft.metadata?.name?.replace(/[#0123456789 ]*$/, "") ||
                       ""}
                   </span>

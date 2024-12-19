@@ -24,9 +24,13 @@ const StakingInformation: FC<StakingInformationProps> = ({ contractId }) => {
     }
   );
 
-  const { balance, isLoading: loadingBalance, error: balanceError } = useAccountBalance(
-    algosdk.getApplicationAddress(contractId)
-  );
+  console.log({ account });
+
+  const {
+    balance,
+    isLoading: loadingBalance,
+    error: balanceError,
+  } = useAccountBalance(algosdk.getApplicationAddress(contractId));
 
   const renderBalance = () => {
     if (loadingBalance) {
@@ -36,7 +40,9 @@ const StakingInformation: FC<StakingInformationProps> = ({ contractId }) => {
           width={120}
           height={24}
           sx={{
-            bgcolor: isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+            bgcolor: isDarkTheme
+              ? "rgba(255, 255, 255, 0.1)"
+              : "rgba(0, 0, 0, 0.1)",
           }}
         />
       );
@@ -114,7 +120,10 @@ const StakingInformation: FC<StakingInformationProps> = ({ contractId }) => {
           <Typography variant="body2">
             <strong>Est. Total Tokens:</strong>
             {` `}
-            {formatter.format(balance ? balance : account.global_total / 1e6)} VOI
+            {formatter.format(
+              balance ? balance : account.global_total / 1e6
+            )}{" "}
+            VOI
           </Typography>
         </>
       ) : null}
