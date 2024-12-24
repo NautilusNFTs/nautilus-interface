@@ -26,6 +26,7 @@ import { BigNumber } from "bignumber.js";
 import CartNftCard from "../../components/CartNFTCard";
 import { ARC72_INDEXER_API, HIGHFORGE_API } from "../../config/arc72-idx";
 import { useWallet } from "@txnlab/use-wallet-react";
+import { useName } from "@/hooks/useName";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -438,6 +439,8 @@ export const Token: React.FC = () => {
   }, [id]);
   console.log({ collectionInfo });
 
+  const { fetchName } = useName();
+
   const [nft, setNft] = React.useState<any>(null);
   useEffect(() => {
     if (
@@ -471,7 +474,6 @@ export const Token: React.FC = () => {
       });
       const arc72_ownerOfR = await ciARC72.arc72_ownerOf(BigInt(tid));
       const arc72_getApprovedR = await ciARC72.arc72_getApproved(BigInt(tid));
-      console.log({ arc72_ownerOfR, arc72_getApprovedR });
       if (!arc72_ownerOfR.success) throw new Error("Failed to get owner");
       if (!arc72_getApprovedR.success)
         throw new Error("Failed to get approved");
@@ -533,12 +535,16 @@ export const Token: React.FC = () => {
       const royalties = nft?.metadata?.royalties
         ? decodeRoyalties(nft?.metadata?.royalties || "")
         : {};
+
+      const ownerName = await fetchName(arc72_ownerOf);
+
       const displayNft = {
         ...nftData,
         metadata,
         royalties,
         approved: arc72_getApproved,
         owner: arc72_ownerOf,
+        ownerName,
         listing: validListing ? listing : undefined,
       };
       setNft(displayNft);

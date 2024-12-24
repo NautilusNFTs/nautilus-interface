@@ -75,6 +75,8 @@ const CurrencySelect: React.FC<CurrencySelectProps> = ({
   simulationResults = {},
   listingCurrency = 0,
 }) => {
+  console.log({ balances });
+
   const { activeAccount } = useWallet();
   const theme = useTheme();
   const isDarkMode = useSelector((state: RootState) => state.theme.isDarkTheme);
@@ -124,6 +126,7 @@ const CurrencySelect: React.FC<CurrencySelectProps> = ({
   };
 
   const formatBalance = (token: PaymentToken) => {
+    console.log({ token, balances });
     if (!balances || !balances[token.tokenId]) return "";
     const balance = balances[token.tokenId];
     if (balance.loading) return "Loading...";
@@ -521,10 +524,14 @@ const CurrencySelect: React.FC<CurrencySelectProps> = ({
                                 display: "flex",
                                 alignItems: "center",
                                 gap: 0.5,
-                                color: isDarkMode ? "rgba(255, 255, 255, 0.7)" : "inherit",
+                                color: isDarkMode
+                                  ? "rgba(255, 255, 255, 0.7)"
+                                  : "inherit",
                                 textDecoration: "none",
                                 "&:hover": {
-                                  color: isDarkMode ? "#FFFFFF" : "primary.main",
+                                  color: isDarkMode
+                                    ? "#FFFFFF"
+                                    : "primary.main",
                                 },
                               }}
                             >
@@ -546,7 +553,10 @@ const CurrencySelect: React.FC<CurrencySelectProps> = ({
                             {token.tokenId === 390001 ? (
                               "Buy"
                             ) : isLoading(token) ? (
-                              <Skeleton width={40} sx={{ bgcolor: "rgba(255,255,255,0.1)" }} />
+                              <Skeleton
+                                width={40}
+                                sx={{ bgcolor: "rgba(255,255,255,0.1)" }}
+                              />
                             ) : (
                               "Buy"
                             )}
@@ -614,6 +624,8 @@ const CurrencySelect: React.FC<CurrencySelectProps> = ({
       </>
     );
   }
+
+  console.log({ filteredTokens });
 
   return (
     <>
@@ -805,7 +817,9 @@ const CurrencySelect: React.FC<CurrencySelectProps> = ({
                               display: "flex",
                               alignItems: "center",
                               gap: 0.5,
-                              color: isDarkMode ? "rgba(255, 255, 255, 0.7)" : "inherit",
+                              color: isDarkMode
+                                ? "rgba(255, 255, 255, 0.7)"
+                                : "inherit",
                               textDecoration: "none",
                               "&:hover": {
                                 color: isDarkMode ? "#FFFFFF" : "primary.main",
@@ -829,7 +843,10 @@ const CurrencySelect: React.FC<CurrencySelectProps> = ({
                           {token.tokenId === 390001 ? (
                             "Buy"
                           ) : isLoading(token) ? (
-                            <Skeleton width={40} sx={{ bgcolor: "rgba(255,255,255,0.1)" }} />
+                            <Skeleton
+                              width={40}
+                              sx={{ bgcolor: "rgba(255,255,255,0.1)" }}
+                            />
                           ) : (
                             "Buy"
                           )}

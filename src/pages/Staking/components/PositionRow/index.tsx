@@ -420,7 +420,7 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
     const roundDifference = position.part_vote_lst - currentRound;
     const isExpired = roundDifference <= 0;
     const timeRemaining = getExpirationTime(position.part_vote_lst);
-    
+
     // Calculate if expiration is within 7 days
     const secondsRemaining = roundDifference * 2.8;
     const sevenDaysInSeconds = 7 * 24 * 60 * 60;
@@ -438,11 +438,19 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
         {timeRemaining === null ? (
           <Skeleton width={80} />
         ) : (
-          <Typography sx={{ color: isExpired ? "error.main" : isNearExpiration ? "warning.main" : "inherit" }}>
+          <Typography
+            sx={{
+              color: isExpired
+                ? "error.main"
+                : isNearExpiration
+                ? "warning.main"
+                : "inherit",
+            }}
+          >
             {timeRemaining}
           </Typography>
         )}
-        {(!isExpired && !isNearExpiration) && (
+        {!isExpired && !isNearExpiration && (
           <Button
             variant={isDarkTheme ? "outlined" : "contained"}
             size="small"
@@ -467,7 +475,7 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
             Update
           </Button>
         )}
-        {(!isExpired && isNearExpiration) && (
+        {!isExpired && isNearExpiration && (
           <Button
             variant={isDarkTheme ? "outlined" : "contained"}
             size="small"

@@ -67,7 +67,8 @@ export const useCollectionInfo = () => {
   const data = useQuery({
     queryFn: () => {
       return axios
-        .get(`https://prod-voi.api.highforge.io/projects`)
+        //.get(`https://prod-voi.api.highforge.io/projects`)
+        .get(`https://mainnet-idx.nautilus.sh/nft-indexer/v1/collections`)
         .then((res: any) => res.data.results);
     },
     queryKey: ["collection-collection-info"],
@@ -75,6 +76,7 @@ export const useCollectionInfo = () => {
   });
   return data;
 };
+
 export const useListings = (options?: { seller?: string[] }) => {
   const data = useQuery({
     queryFn: () => {

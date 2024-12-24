@@ -8,6 +8,7 @@ import {
   Container,
   Grid,
   Unstable_Grid2 as Grid2,
+  Skeleton,
   Stack,
   ToggleButton,
   ToggleButtonGroup,
@@ -65,6 +66,7 @@ import {
 import { GridLoader } from "react-spinners";
 import { useWallet } from "@txnlab/use-wallet-react";
 import InfoIcon from "@mui/icons-material/Info";
+import { useName } from "@/hooks/useName";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -139,6 +141,10 @@ export const Account: React.FC = () => {
 
   /* Wallet */
   const { activeAccount, signTransactions } = useWallet();
+
+  const { name, avatar, loading } = useName(id);
+
+  console.log({ name, avatar, loading });
 
   /* Copy to clipboard */
 
@@ -243,6 +249,9 @@ export const Account: React.FC = () => {
         });
         const nfts = [];
         for (const t of res) {
+          // Skip NFTs with collection ID 797610
+          if (t.contractId === 797610) continue;
+          
           const listing = listings?.find(
             (l: any) =>
               `${l.collectionId}` === `${t.contractId}` &&
@@ -355,8 +364,6 @@ export const Account: React.FC = () => {
   ) => {
     if (!activeAccount || !selected.length) return;
     try {
-      console.log({ price, currency, token });
-
       setIsListing(true);
       const { algodClient, indexerClient } = getAlgorandClients();
       const selectedNfts = selected.map((i) => nfts[i]);
@@ -394,7 +401,10 @@ export const Account: React.FC = () => {
         console.log({ nft });
         const customR = await mp.list(
           activeAccount.address,
-          nft,
+          {
+            ...nft,
+            tokenId: BigInt(nft.tokenId),
+          },
           priceBi.toString(),
           paymentToken,
           {
@@ -411,7 +421,7 @@ export const Account: React.FC = () => {
             skipEnsure: true,
           }
         );
-        console.log({ customR });
+        console.log({ mpList: { customR } });
         buildN.push([customR.objs]);
       }
 
@@ -444,7 +454,10 @@ export const Account: React.FC = () => {
             (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
           )
         );
-        await algodClient.sendRawTransaction(stxns as Uint8Array[]).do();
+        const res = await algodClient
+          .sendRawTransaction(stxns as Uint8Array[])
+          .do();
+        console.log({ res });
         setProgress(++progress);
       }
       toast.success("Listed successfully!");
@@ -531,12 +544,15 @@ export const Account: React.FC = () => {
         throw new Error("failed in simulate");
       }
 
-      await signTransactions(
+      const stxns = await signTransactions(
         customR.txns.map(
           (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
         )
       );
-      //.then(sendTransactions);
+
+      const res = await algodClient
+        .sendRawTransaction(stxns as Uint8Array[])
+        .do();
 
       // ---------------------------------------
       // QUEST HERE
@@ -847,12 +863,14 @@ export const Account: React.FC = () => {
           throw new Error("custom failed in simulate");
         }
         const txns = customR.txns;
-        const res = await signTransactions(
+        const stxns = await signTransactions(
           txns.map((txn: string) => new Uint8Array(Buffer.from(txn, "base64")))
         );
-        //.then(sendTransactions);
+        const res = await algodClient
+          .sendRawTransaction(stxns as Uint8Array[])
+          .do();
 
-        await algodClient.sendRawTransaction(res as Uint8Array[]).do();
+        console.log({ res });
 
         // ---------------------------------------
         // QUEST HERE
@@ -1311,19 +1329,29 @@ export const Account: React.FC = () => {
 
   return (
     <Layout>
-      <div>
+      <div style={{ marginTop: "2rem" }}>
         <Stack spacing={2} direction="row">
-          <Avatar
-            sx={{
-              background: `linear-gradient(45deg, ${stringToColorCode(
-                String(id)
-              )}, ${isDarkTheme ? "#000" : "#fff"})`,
-              width: "145px",
-              height: "145px",
-            }}
-          >
-            {String(id).slice(0, 1)}
-          </Avatar>
+          {loading ? (
+            <Skeleton
+              variant="circular"
+              width={145}
+              height={145}
+              sx={{ flexShrink: 0 }}
+            />
+          ) : (
+            <Avatar
+              sx={{
+                background: `linear-gradient(45deg, ${stringToColorCode(
+                  String(id)
+                )}, ${isDarkTheme ? "#000" : "#fff"})`,
+                width: "145px",
+                height: "145px",
+              }}
+              src={avatar || undefined}
+            >
+              {String(id).slice(0, 1)}
+            </Avatar>
+          )}
           <Grid container spacing={2}>
             {id?.split(",")?.map((id) => (
               <Grid xs={12} key={id}>
@@ -1336,7 +1364,7 @@ export const Account: React.FC = () => {
                   <AccountLabel>Account</AccountLabel>
                   <Stack direction="row" gap={1}>
                     <AccountValue>
-                      {String(id).slice(0, 4)}...{String(id).slice(-4)}
+                      {!loading ? name : <Skeleton width={100} height={16} />}
                     </AccountValue>
                     <ContentCopyIcon
                       onClick={() => {

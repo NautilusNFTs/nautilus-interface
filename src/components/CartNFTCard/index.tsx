@@ -647,11 +647,16 @@ const CartNftCard: React.FC<NFTCardProps> = ({
     }
   };
   const collectionsMissingImage = [35720076];
-  const url = !collectionsMissingImage.includes(Number(token.contractId))
+
+  const url = metadata.image?.includes("ipfs://")
+    ? `https://ipfs.io/ipfs/${metadata.image.split("ipfs://")[1]}`
+    : !collectionsMissingImage?.includes(Number(token.contractId))
     ? `${HIGHFORGE_CDN}/i/${encodeURIComponent(token.metadataURI)}?w=400`
     : metadata.image;
 
-  const displayName = (metadata.name || "").match(/[0-9]/)
+  const displayName = metadata.name?.includes(".voi")
+    ? metadata.name
+    : (metadata.name || "").match(/[0-9]/)
     ? metadata.name
     : `${metadata.name} #${token.tokenId}`;
 

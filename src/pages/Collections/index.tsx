@@ -25,6 +25,7 @@ import {
   useSmartTokens,
   useTokens,
 } from "@/components/Navbar/hooks/collections";
+
 import { GridLoader } from "react-spinners";
 
 const SectionHeading = styled.div`
@@ -97,11 +98,13 @@ export const Collections: React.FC = () => {
 
   /* Tokens */
   // !Replaced data fetching and state management with react-query hooks
-  const { data: tokens, status: tokenStatus ,error:tokenError} = useTokens();
+  const { data: tokens, status: tokenStatus, error: tokenError } = useTokens();
 
   /* Collections */
   // !Replaced data fetching and state management with react-query hooks
   const { data: collections, status: collectionStatus } = useCollections();
+
+  console.log({ collections });
 
   /* Sales */
 
@@ -121,9 +124,6 @@ export const Collections: React.FC = () => {
   /* NFT Navigator Listings */
   // !Replaced data fetching and state management with react-query hooks
   const { data: listings, status: listingsStatus } = useListings();
-
-
-
 
   const rankings: any = useMemo(() => {
     if (

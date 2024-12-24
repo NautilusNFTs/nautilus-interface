@@ -383,7 +383,7 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
     );
     ci.setFee(5000);
     const withdrawR2 = await ci.withdraw(
-      nft.tokenId,
+      Number(nft.tokenId),
       BigInt(data?.withdrawable || "0")
     );
     if (!withdrawR2.success) {
@@ -440,7 +440,9 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
                 fontSize: "0.75rem",
                 color: isDarkTheme ? "#FFFFFF" : undefined,
                 backgroundColor: isDarkTheme ? "transparent" : undefined,
-                borderColor: isDarkTheme ? "rgba(255, 255, 255, 0.3)" : undefined,
+                borderColor: isDarkTheme
+                  ? "rgba(255, 255, 255, 0.3)"
+                  : undefined,
                 "&:hover": {
                   backgroundColor: isDarkTheme
                     ? "rgba(255, 255, 255, 0.1)"
@@ -461,7 +463,7 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
     const roundDifference = data.part_vote_lst - currentRound;
     const isExpired = roundDifference <= 0;
     const timeRemaining = getExpirationTime(data.part_vote_lst);
-    
+
     // Calculate if expiration is within 7 days
     const secondsRemaining = roundDifference * 2.8;
     const sevenDaysInSeconds = 7 * 24 * 60 * 60;
@@ -479,11 +481,19 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
         {timeRemaining === null ? (
           <Skeleton width={80} />
         ) : (
-          <Typography sx={{ color: isExpired ? "error.main" : isNearExpiration ? "warning.main" : "inherit" }}>
+          <Typography
+            sx={{
+              color: isExpired
+                ? "error.main"
+                : isNearExpiration
+                ? "warning.main"
+                : "inherit",
+            }}
+          >
             {timeRemaining}
           </Typography>
         )}
-        {(!isExpired && !isNearExpiration && isDelegate) && (
+        {!isExpired && !isNearExpiration && isDelegate && (
           <Button
             variant={isDarkTheme ? "outlined" : "contained"}
             size="small"
@@ -508,7 +518,7 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
             Update
           </Button>
         )}
-        {(!isExpired && isNearExpiration && isDelegate) && (
+        {!isExpired && isNearExpiration && isDelegate && (
           <Button
             variant={isDarkTheme ? "outlined" : "contained"}
             size="small"
@@ -536,7 +546,7 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
         <ParticipateModal
           open={isParticipateModalOpen}
           onClose={() => setIsParticipateModalOpen(false)}
-          contractId={nft.tokenId}
+          contractId={Number(nft.tokenId)}
         />
       </Box>
     );
@@ -688,7 +698,7 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
         open={isDelegateModalOpen}
         onClose={() => setIsDelegateModalOpen(false)}
         contractId={nft.contractId}
-        tokenId={nft.tokenId}
+        tokenId={Number(nft.tokenId)}
         currentDelegate={data?.global_delegate || ""}
         allowNaaS={true}
         naaSAddress={NAAS_ADDRESS}

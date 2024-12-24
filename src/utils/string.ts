@@ -26,6 +26,12 @@ export const stripTrailingZeroBytes = (str: string) => {
   if (index > 0) {
     return str.slice(0, str.indexOf("\x00"));
   } else {
-    return str;
+    return "";
   }
 };
+
+export function stringToUint8Array(str: string, length: number): Uint8Array {
+  const bytes = new Uint8Array(length);
+  bytes.set(new Uint8Array(Buffer.from(str, "utf8")), 0);
+  return bytes;
+}

@@ -55,6 +55,9 @@ import { useMarketplaceListings } from "@/hooks/mp";
 import TollIcon from "@mui/icons-material/Toll";
 import NorthEastIcon from "@mui/icons-material/NorthEast";
 import { Staking } from "../Staking";
+import { CONTRACT } from "ulujs";
+import { getAlgorandClients } from "@/wallets";
+import { useName } from "@/hooks/useName";
 
 const PriceRangeContainer = styled.div`
   display: flex;
@@ -220,7 +223,8 @@ const ListingRoot = styled.div`
   display: flex;
   align-items: flex-start;
   gap: var(--Main-System-20px, 20px);
-  margin-top: 44px;
+  margin-top: 32px;
+  padding-top: 0px;
 `;
 
 const SidebarFilterRoot = styled(Stack)`
@@ -274,16 +278,21 @@ const HeadingContainer = styled.div`
 const HeadingTitle = styled.div`
   text-align: center;
   font-family: Nohemi;
-  /* font-size: 48px; */
   font-style: normal;
   font-weight: 700;
-  line-height: 40px; /* 83.333% */
+  line-height: 100%;
   letter-spacing: 0.5px;
   &.dark {
     color: #fff;
   }
   &.light {
     color: #93f;
+  }
+
+  // Add responsive font sizes
+  font-size: 32px; // Default for mobile
+  @media (min-width: 768px) {
+    font-size: 48px; // Larger screens
   }
 `;
 
@@ -428,10 +437,33 @@ const BannerContainer = styled.div`
   height: 200px;
   align-items: flex-end;
   flex-shrink: 0;
-  overflow: hidden;
   border-radius: 16px;
   background-size: cover;
-  padding-bottom: 50px;
+  position: relative;
+  margin-bottom: 100px;
+
+  @media (min-width: 769px) {
+    margin-bottom: 24px;
+    padding-bottom: 0;
+  }
+`;
+
+const BannerOverlay = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0 20px 20px;
+  border-radius: 16px;
+
+  @media (min-width: 769px) {
+    padding: 0 40px 50px;
+  }
 `;
 
 const BannerTitleContainer = styled.div`
@@ -458,10 +490,49 @@ const BannerTitle = styled.h1`
   text-edge: cap;
   font-feature-settings: "clig" off, "liga" off;
   font-family: Nohemi;
-  font-size: 40px;
   font-style: normal;
   font-weight: 700;
-  line-height: 100%; /* 40px */
+  line-height: 100%;
+
+  // Add responsive font sizes
+  font-size: 28px; // Default for mobile
+  @media (min-width: 768px) {
+    font-size: 40px; // Larger screens
+  }
+`;
+
+const BannerUrlContainer = styled.a`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(50px);
+  border-radius: 16px;
+  text-decoration: none;
+  color: white;
+  transition: opacity 0.2s;
+
+  &:hover {
+    opacity: 0.8;
+  }
+`;
+
+const BannerLinksContainer = styled.div`
+  display: flex;
+  gap: 12px;
+  z-index: 1;
+  @media (max-width: 768px) {
+    position: absolute;
+    bottom: -105px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: ${(props) =>
+      props.theme.isDarkTheme ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)"};
+    padding: 12px;
+    border-radius: 16px;
+    backdrop-filter: blur(50px);
+  }
 `;
 
 const StyledLink = styled(Link)`
@@ -560,6 +631,8 @@ export const Collection: React.FC = () => {
   }, [id]);
 
   console.log("collectionInfo", collectionInfo);
+
+  const { fetchCollectionName, fetchText } = useName();
 
   const [search, setSearch] = useState<string>("");
   const [searchValue, setSearchValue] = useState<string>("");
@@ -849,7 +922,9 @@ export const Collection: React.FC = () => {
         )?.image.slice(7)}`;
   }, [collectionInfo, collectionNfts]);
 
+  // TODO use name
   const displayCollectionName = useMemo(() => {
+    if (id === "797609") return ".voi";
     if (collectionInfo?.project?.title) return collectionInfo?.project?.title;
     if (collectionNfts.length === 0) return "";
     return JSON.parse(collectionNfts[0]?.metadata)?.name?.replace(
@@ -858,7 +933,26 @@ export const Collection: React.FC = () => {
     );
   }, [collectionInfo, collectionNfts]);
 
+  const navigate = useNavigate();
+
   const { activeAccount } = useWallet();
+
+  const [collectionUrl, setCollectionUrl] = React.useState<string>("");
+  const [collectionTwitter, setCollectionTwitter] = React.useState<string>("");
+  useEffect(() => {
+    if (!id) return;
+    // get name from Resolver
+    fetchCollectionName(id).then((name: string) => {
+      fetchText(name, "url").then((text: string) => {
+        setCollectionUrl(text);
+      });
+      fetchText(name, "com.twitter").then((text: string) => {
+        setCollectionTwitter(text);
+      });
+    });
+  }, [id]);
+
+  console.log({ collectionUrl, collectionTwitter });
 
   const [accounts, setAccounts] = React.useState<any[]>([]);
   React.useEffect(() => {
@@ -1151,17 +1245,52 @@ export const Collection: React.FC = () => {
   return (
     <>
       <Layout>
-        <BannerContainer
-          style={{
-            backgroundImage: `url(${displayCoverImage})`,
-            backgroundPosition: "center",
-            backgroundSize: "cover",
-          }}
-        >
-          <BannerTitleContainer>
-            <BannerTitle>{displayCollectionName}</BannerTitle>
-          </BannerTitleContainer>
-        </BannerContainer>
+        <div className="mt-8">
+          <BannerContainer
+            style={{
+              backgroundImage: `url(${displayCoverImage})`,
+              backgroundPosition: "center",
+              backgroundSize: "cover",
+            }}
+          >
+            <BannerOverlay>
+              <BannerTitleContainer>
+                <BannerTitle>{displayCollectionName}</BannerTitle>
+              </BannerTitleContainer>
+
+              <BannerLinksContainer>
+                {collectionTwitter && (
+                  <BannerUrlContainer
+                    href={`https://twitter.com/${collectionTwitter}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="white"
+                    >
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                    </svg>
+                  </BannerUrlContainer>
+                )}
+
+                {collectionUrl && (
+                  <BannerUrlContainer
+                    href={collectionUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <span>Visit Website</span>
+                    <NorthEastIcon sx={{ fontSize: 20 }} />
+                  </BannerUrlContainer>
+                )}
+              </BannerLinksContainer>
+            </BannerOverlay>
+          </BannerContainer>
+        </div>
         <ListingRoot className="!flex !flex-col lg:!flex-row !items-center md:!items-start">
           {/*<div className="sm:!hidden w-full">
             <DialogSearch>{renderSidebar}</DialogSearch>
@@ -1288,9 +1417,42 @@ export const Collection: React.FC = () => {
                   backgroundSize: "cover",
                 }}
               >
-                <BannerTitleContainer>
-                  <BannerTitle>{displayCollectionName}</BannerTitle>
-                </BannerTitleContainer>
+                <BannerOverlay>
+                  <BannerTitleContainer>
+                    <BannerTitle>{displayCollectionName}</BannerTitle>
+                  </BannerTitleContainer>
+
+                  <BannerLinksContainer>
+                    {collectionTwitter && (
+                      <BannerUrlContainer
+                        href={`https://twitter.com/${collectionTwitter}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="white"
+                        >
+                          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                        </svg>
+                      </BannerUrlContainer>
+                    )}
+
+                    {collectionUrl && (
+                      <BannerUrlContainer
+                        href={collectionUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <span>Visit Website</span>
+                        <NorthEastIcon sx={{ fontSize: 20 }} />
+                      </BannerUrlContainer>
+                    )}
+                  </BannerLinksContainer>
+                </BannerOverlay>
               </BannerContainer>
               <Stack direction="row" spacing={2} sx={{ justifyContent: "end" }}>
                 <ToggleButtonGroup
@@ -1398,7 +1560,6 @@ export const Collection: React.FC = () => {
                         ) : null
                       )}
                     </StatContainer>
-
                     <Stack
                       direction="row"
                       spacing={2}

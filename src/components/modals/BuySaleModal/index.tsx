@@ -116,10 +116,6 @@ const BuySaleModal: React.FC<BuySaleModalProps> = ({
   paymentAltTokenId = "0",
   availablePaymentTokens = [],
 }) => {
-  const smartTokens = useSelector((state: any) => state.smartTokens.tokens);
-  const smartTokenStatus = useSelector(
-    (state: any) => state.smartTokens.status
-  );
   const isDarkTheme = useSelector((state: any) => state.theme.isDarkTheme);
   const { activeAccount, signTransactions } = useWallet();
 
@@ -329,16 +325,18 @@ const BuySaleModal: React.FC<BuySaleModalProps> = ({
                   style={{ width: "100%", borderRadius: "25px" }}
                 />
               </Grid>
+
               <Grid item xs={12} sm={6}>
                 <Box sx={{ p: 1 }}>
                   <InputLabel htmlFor="name">Name</InputLabel>
                   <Typography variant="h5" gutterBottom>
-                    {tokenMetadata.name ||
-                      tokenMetadata.unit_name ||
-                      `Token #${token.tokenId}`}
+                    {tokenMetadata.name?.includes(".voi")
+                      ? tokenMetadata.name
+                      : tokenMetadata.name ||
+                        tokenMetadata.unit_name ||
+                        `Token #${token.tokenId}`}
                   </Typography>
                 </Box>
-
                 <Box sx={{ p: 1 }}>
                   <InputLabel htmlFor="price">Price</InputLabel>
                   <Typography variant="h5" gutterBottom>
@@ -351,14 +349,12 @@ const BuySaleModal: React.FC<BuySaleModalProps> = ({
                     </Stack>
                   </Typography>
                 </Box>
-
                 <Box sx={{ p: 1 }}>
                   <InputLabel htmlFor="balance">Seller</InputLabel>
                   <Typography variant="h5" gutterBottom>
                     {seller?.slice(0, 4)}...{seller?.slice(-4)}
                   </Typography>
                 </Box>
-
                 {currency !== "VOI" && (
                   <Box sx={{ p: 1 }}>
                     <InputLabel htmlFor="balance">VOI Balance</InputLabel>
@@ -369,7 +365,6 @@ const BuySaleModal: React.FC<BuySaleModalProps> = ({
                     </Typography>
                   </Box>
                 )}
-
                 {highestSale > 0 && (
                   <Box sx={{ p: 1 }}>
                     <InputLabel htmlFor="balance">Highest Sale</InputLabel>
@@ -410,6 +405,12 @@ const BuySaleModal: React.FC<BuySaleModalProps> = ({
                       }
                     }}
                     canBuy={(tokenId) => {
+                      console.log({
+                        tokenId,
+                        paymentTokens,
+                        balances,
+                        simulationResults,
+                      });
                       const token = paymentTokens.find(
                         (t) => t.tokenId === tokenId
                       );

@@ -14,6 +14,11 @@ import {
 import { useWallet } from "@txnlab/use-wallet-react";
 import { ArrowDownward } from "@mui/icons-material";
 import { currentVersion, deploymentVersion } from "@/contants/versions";
+import { getAlgorandClients } from "@/wallets";
+import { CONTRACT } from "ulujs";
+import { namehash } from "@/lib/utils";
+import { stripTrailingZeroBytes } from "@/utils/string";
+import { useName } from "@/hooks/useName";
 
 const WalletIcon2 = () => {
   return (
@@ -467,6 +472,61 @@ function BasicMenu() {
     setAnchorEl(null);
   };
 
+  const { name, loading, error } = useName(activeAccount?.address);
+
+  console.log({ name, loading, error });
+
+  /*
+  const [displayName, setDisplayName] = React.useState("");
+  React.useEffect(() => {
+    if (!activeAccount) return;
+    const { algodClient } = getAlgorandClients();
+    const ci = new CONTRACT(
+      797608,
+      algodClient,
+      undefined,
+      {
+        name: "vns public resolver",
+        description: "vns public resolver",
+        methods: [
+          {
+            name: "name",
+            description: "get name from resolver",
+            args: [
+              {
+                type: "byte[32]",
+              },
+            ],
+            returns: {
+              type: "byte[256]",
+            },
+          },
+        ],
+        events: [],
+      },
+      {
+        addr: activeAccount.address,
+        sk: new Uint8Array(),
+      }
+    );
+    namehash(`${activeAccount.address}.addr.reverse`).then((node) =>
+      ci.name(node).then((res: { success: boolean; returnValue: any }) => {
+        console.log({ res });
+        if (res.success) {
+          const name = stripTrailingZeroBytes(res.returnValue);
+          setDisplayName(name);
+        } else {
+          setDisplayName(
+            activeAccount.address.slice(0, 4) +
+              "..." +
+              activeAccount.address.slice(-4)
+          );
+        }
+      })
+    );
+  }, [activeAccount]);
+  */
+
   // ---------------------------------------------
   // QUEST
   // ---------------------------------------------
@@ -512,8 +572,7 @@ function BasicMenu() {
           }}
         >
           <AccountDropdownLabel className="light">
-            {activeAccount?.address.slice(0, 4)}...
-            {activeAccount?.address.slice(-4)}
+            {loading ? "Loading..." : name || ""}
           </AccountDropdownLabel>
           <Link
             to={`/wallet/${activeAccount?.address}`}

@@ -44,6 +44,18 @@ import "swiper/css/navigation";
 import "swiper/css/pagination";
 import CustomPagination from "../../components/Pagination";
 import { Tabs, Tab } from "@mui/material";
+import { useName } from "@/hooks/useName";
+
+const formatPrice = (price: number) => {
+  return (price / 1e6).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+const truncateAddress = (address: string) => {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+};
 
 const ActivityFilterContainer = styled.div`
   display: flex;
@@ -282,6 +294,101 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+// Extract TableRow into separate component
+const ActivityTableRow = ({
+  sale,
+  isDarkTheme,
+  tokenInfo,
+  collectionName,
+}: {
+  sale: Sale;
+  isDarkTheme: boolean;
+  tokenInfo: any;
+  collectionName: string;
+}) => {
+  //const tokenInfo: any = getTokenInfo(sale.collectionId, sale.tokenId);
+  const { fetchName } = useName();
+  const metadata = JSON.parse(tokenInfo?.metadata || "{}");
+  const [sellerName, setSellerName] = useState<string>("");
+  useEffect(() => {
+    fetchName(sale.seller).then(setSellerName);
+  }, [sale]);
+  const [buyerName, setBuyerName] = useState<string>("");
+  useEffect(() => {
+    fetchName(sale.buyer).then(setBuyerName);
+  }, [sale]);
+  console.log({ sellerName, buyerName });
+  return (
+    <TableRow>
+      <TableCell>
+        <Link
+          to={`/collection/${sale.collectionId}/token/${sale.tokenId}`}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            textDecoration: "none",
+            color: isDarkTheme ? "#fff" : "inherit",
+          }}
+        >
+          <Box
+            component="img"
+            src={
+              metadata?.image
+                ? metadata.image.indexOf("ipfs") !== -1
+                  ? `https://ipfs.io/ipfs/${metadata.image.replace(
+                      "ipfs://",
+                      ""
+                    )}`
+                  : metadata.image
+                : "/placeholder.png"
+            }
+            alt={metadata?.name || `Token #${sale.tokenId}`}
+            sx={{
+              width: 40,
+              height: 40,
+              borderRadius: "8px",
+              objectFit: "cover",
+              backgroundColor: "rgba(0, 0, 0, 0.1)",
+            }}
+            onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+              e.currentTarget.src = "/placeholder.png";
+            }}
+          />
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {metadata?.name || `Token #${sale.tokenId}`}
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: isDarkTheme
+                  ? "rgba(255, 255, 255, 0.5)"
+                  : "rgba(0, 0, 0, 0.5)",
+                display: "block",
+              }}
+            >
+              {collectionName}
+            </Typography>
+          </Box>
+        </Link>
+      </TableCell>
+      <TableCell>{formatPrice(sale.price)} VOI</TableCell>
+      <TableCell>
+        <Link to={`/account/${sale.seller}`}>
+          {sellerName ? sellerName : <Skeleton width={100} height={16} />}
+        </Link>
+      </TableCell>
+      <TableCell>
+        <Link to={`/account/${sale.buyer}`}>
+          {buyerName ? buyerName : <Skeleton width={100} height={16} />}
+        </Link>
+      </TableCell>
+      <TableCell>{moment(sale.timestamp * 1000).fromNow()}</TableCell>
+    </TableRow>
+  );
+};
+
 export const Home: React.FC = () => {
   /* Dispatch */
   const dispatch = useDispatch();
@@ -344,6 +451,7 @@ export const Home: React.FC = () => {
 
   // Add collection info state
   const [collectionInfo, setCollectionInfo] = useState<Record<string, any>>({});
+  console.log({ collectionInfo });
 
   // Update effect to fetch sales and collection info
   useEffect(() => {
@@ -417,10 +525,10 @@ export const Home: React.FC = () => {
     if (collection?.firstToken?.metadata) {
       try {
         const metadata = JSON.parse(collection.firstToken.metadata);
-        return (
-          metadata.name?.replace(/\s*#?\d+$/, "") ||
-          `Collection #${collectionId}`
-        );
+        return metadata.name?.includes(".voi")
+          ? ".voi"
+          : metadata.name?.replace(/\s*#?\d+$/, "") ||
+              `Collection #${collectionId}`;
       } catch {
         return `Collection #${collectionId}`;
       }
@@ -429,7 +537,7 @@ export const Home: React.FC = () => {
   };
 
   // Helper function to get token info from cache
-  const getTokenInfo = (collectionId: number, tokenId: number) => {
+  const getTokenInfo = (collectionId: number, tokenId: number | string) => {
     return tokenCache[`${collectionId}-${tokenId}`];
   };
 
@@ -492,17 +600,6 @@ export const Home: React.FC = () => {
       }
     }
   `;
-
-  const truncateAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
-
-  const formatPrice = (price: number) => {
-    return (price / 1e6).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  };
 
   const [currentPage, setCurrentPage] = useState(1);
   const salesPerPage = 5;
@@ -1078,89 +1175,18 @@ export const Home: React.FC = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paginatedSales.map((sale) => {
-                      const tokenInfo: any = getTokenInfo(
-                        sale.collectionId,
-                        sale.tokenId
-                      );
-                      const metadata = JSON.parse(tokenInfo?.metadata || "{}");
-                      return (
-                        <TableRow key={sale.transactionId}>
-                          <TableCell>
-                            <Link
-                              to={`/collection/${sale.collectionId}/token/${sale.tokenId}`}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "12px",
-                                textDecoration: "none",
-                                color: isDarkTheme ? "#fff" : "inherit",
-                              }}
-                            >
-                              <Box
-                                component="img"
-                                src={
-                                  metadata?.image
-                                    ? metadata.image.indexOf("ipfs") !== -1
-                                      ? `https://ipfs.io/ipfs/${metadata.image.replace(
-                                          "ipfs://",
-                                          ""
-                                        )}`
-                                      : metadata.image
-                                    : "/placeholder.png"
-                                }
-                                alt={metadata?.name || `Token #${sale.tokenId}`}
-                                sx={{
-                                  width: 40,
-                                  height: 40,
-                                  borderRadius: "8px",
-                                  objectFit: "cover",
-                                  backgroundColor: "rgba(0, 0, 0, 0.1)",
-                                }}
-                                onError={(
-                                  e: React.SyntheticEvent<HTMLImageElement>
-                                ) => {
-                                  e.currentTarget.src = "/placeholder.png";
-                                }}
-                              />
-                              <Box>
-                                <Typography
-                                  variant="body2"
-                                  sx={{ fontWeight: 600 }}
-                                >
-                                  {metadata?.name || `Token #${sale.tokenId}`}
-                                </Typography>
-                                <Typography
-                                  variant="caption"
-                                  sx={{
-                                    color: isDarkTheme
-                                      ? "rgba(255, 255, 255, 0.5)"
-                                      : "rgba(0, 0, 0, 0.5)",
-                                    display: "block",
-                                  }}
-                                >
-                                  {getCollectionName(sale.collectionId)}
-                                </Typography>
-                              </Box>
-                            </Link>
-                          </TableCell>
-                          <TableCell>{formatPrice(sale.price)} VOI</TableCell>
-                          <TableCell>
-                            <Link to={`/account/${sale.seller}`}>
-                              {truncateAddress(sale.seller)}
-                            </Link>
-                          </TableCell>
-                          <TableCell>
-                            <Link to={`/account/${sale.buyer}`}>
-                              {truncateAddress(sale.buyer)}
-                            </Link>
-                          </TableCell>
-                          <TableCell>
-                            {moment(sale.timestamp * 1000).fromNow()}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
+                    paginatedSales.map((sale) => (
+                      <ActivityTableRow
+                        key={sale.transactionId}
+                        sale={sale}
+                        isDarkTheme={isDarkTheme}
+                        tokenInfo={getTokenInfo(
+                          sale.collectionId,
+                          sale.tokenId
+                        )}
+                        collectionName={getCollectionName(sale.collectionId)}
+                      />
+                    ))
                   )}
                 </TableBody>
               </Table>

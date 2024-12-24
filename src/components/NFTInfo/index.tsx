@@ -1676,7 +1676,7 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
                           isDarkTheme ? "owner-value-dark" : "owner-value-light"
                         }
                       >
-                        {nft.owner.slice(0, 4)}...{nft.owner.slice(-4)}
+                        {nft.ownerName}
                       </OwnerValue>
                     </StyledLink>
                   </Stack>
