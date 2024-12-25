@@ -249,9 +249,11 @@ export const Account: React.FC = () => {
         });
         const nfts = [];
         for (const t of res) {
-          // Skip NFTs with collection ID 797610
-          if (t.contractId === 797610) continue;
-          
+          // Skip NFTs with collection ID
+          // 797610
+          // 846601
+          if ([846601, 797610].includes(t.contractId)) continue;
+
           const listing = listings?.find(
             (l: any) =>
               `${l.collectionId}` === `${t.contractId}` &&
