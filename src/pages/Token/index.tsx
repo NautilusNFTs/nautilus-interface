@@ -27,6 +27,7 @@ import CartNftCard from "../../components/CartNFTCard";
 import { ARC72_INDEXER_API, HIGHFORGE_API } from "../../config/arc72-idx";
 import { useWallet } from "@txnlab/use-wallet-react";
 import { useName } from "@/hooks/useName";
+import { useEnvoiResolver } from "@/hooks/useEnvoiResolver";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -345,6 +346,7 @@ const TokenSkeleton: React.FC = () => (
 
 export const Token: React.FC = () => {
   const { activeAccount } = useWallet();
+
   const dispatch = useDispatch();
   /* Sales */
   const sales = useSelector((state: any) => state.sales.sales);

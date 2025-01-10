@@ -61,7 +61,6 @@ const NFTCardWrapper = styled.div`
     rgb(245, 211, 19) 0%,
     rgb(55, 19, 18) 100%
   );
-  //background-color: rgba(255, 255, 255, 1);
   border-radius: 20px;
   display: flex;
   flex-direction: column;
@@ -329,6 +328,7 @@ const CartNftCard: React.FC<NFTCardProps> = ({
   const { activeAccount, signTransactions } = useWallet();
 
   const metadata = JSON.parse(token.metadata || "{}");
+
   const royalties = metadata?.royalties
     ? decodeRoyalties(metadata?.royalties || "")
     : null;

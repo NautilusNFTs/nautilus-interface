@@ -30,6 +30,7 @@ import BlockProductionGraph from "./components/BlockProductionGraph";
 import InfoIcon from "@mui/icons-material/Info";
 import RewardDistributionModal from "./components/RewardDistributionModal";
 import LEDCountdown from "./components/LEDCountdown";
+import { useEnvoiResolver } from '@/hooks/useEnvoiResolver';
 
 const findCommonRatio = (a: number, totalSum: number, n: number) => {
   // Using numerical method (binary search) to find r
@@ -477,7 +478,9 @@ const CommunityChest: React.FC<CommunityChestProps> = ({
   connected,
   address,
 }) => {
-  const ctcInfo = 664258;
+  //const ctcInfo = 390001; // wVOI
+  const ctcInfo = 664258; // CCV
+  //const ctcInfo = 828295; // EV
   const { signTransactions } = useWallet();
   const [totalInChest, setTotalInChest] = useState<string>("0");
   const [holders, setHolders] = useState<number>(0);
@@ -496,6 +499,7 @@ const CommunityChest: React.FC<CommunityChestProps> = ({
   const [currentEpochTokens, setCurrentEpochTokens] = useState<string>("0");
   const [showRewardDistribution, setShowRewardDistribution] = useState(false);
   const [timeUntilNextEpoch, setTimeUntilNextEpoch] = useState<string>("");
+  const { name: resolvedName } = useEnvoiResolver(address);
 
   useEffect(() => {
     if (connected) {
@@ -1266,7 +1270,9 @@ const CommunityChest: React.FC<CommunityChestProps> = ({
             $isDarkTheme={isDarkTheme}
             style={{ marginBottom: "24px" }}
           >
-            <Label $isDarkTheme={isDarkTheme}>Your Balance</Label>
+            <Label $isDarkTheme={isDarkTheme}>
+              {resolvedName ? resolvedName : 'Your'} Balance
+            </Label>
             {isLoading ? (
               <CircularProgress size={24} />
             ) : (

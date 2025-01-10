@@ -26,7 +26,7 @@ export const stripTrailingZeroBytes = (str: string) => {
   if (index > 0) {
     return str.slice(0, str.indexOf("\x00"));
   } else {
-    return "";
+    return str;
   }
 };
 

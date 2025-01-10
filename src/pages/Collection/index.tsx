@@ -58,6 +58,7 @@ import { Staking } from "../Staking";
 import { CONTRACT } from "ulujs";
 import { getAlgorandClients } from "@/wallets";
 import { useName } from "@/hooks/useName";
+import { useEnvoiResolver } from "@/hooks/useEnvoiResolver";
 
 const PriceRangeContainer = styled.div`
   display: flex;
@@ -937,22 +938,39 @@ export const Collection: React.FC = () => {
 
   const { activeAccount } = useWallet();
 
-  const [collectionUrl, setCollectionUrl] = React.useState<string>("");
-  const [collectionTwitter, setCollectionTwitter] = React.useState<string>("");
+  const resolver = useEnvoiResolver();
+  const [collectionProfile, setCollectionProfile] = React.useState<any>(null);
   useEffect(() => {
     if (!id) return;
     // get name from Resolver
     fetchCollectionName(id).then((name: string) => {
+      if (!name) return;
+      resolver.http.search(name).then((results: any[]) => {
+        console.log({ results });
+        if (results.length === 1) {
+          setCollectionProfile(results[0]);
+        }
+      });
+      /*
       fetchText(name, "url").then((text: string) => {
-        setCollectionUrl(text);
+        const sanitizeText = (text: string) => {
+          return stripTrailingZeroBytes(text);
+        };
+        setCollectionUrl(sanitizeText(text));
       });
       fetchText(name, "com.twitter").then((text: string) => {
-        setCollectionTwitter(text);
+        const sanitizeText = (text: string) => {
+          return text
+            .replace(/https?:\/\//, "")
+            .replace(/@/g, "")
+            .replace(/#/g, "")
+            .replace(/ /g, "");
+        };
+        setCollectionTwitter(sanitizeText(text));
       });
+      */
     });
   }, [id]);
-
-  console.log({ collectionUrl, collectionTwitter });
 
   const [accounts, setAccounts] = React.useState<any[]>([]);
   React.useEffect(() => {
@@ -1259,9 +1277,9 @@ export const Collection: React.FC = () => {
               </BannerTitleContainer>
 
               <BannerLinksContainer>
-                {collectionTwitter && (
+                {collectionProfile?.metadata?.["com.twitter"] && (
                   <BannerUrlContainer
-                    href={`https://twitter.com/${collectionTwitter}`}
+                    href={`https://twitter.com/${collectionProfile?.metadata?.["com.twitter"]}`}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -1277,9 +1295,9 @@ export const Collection: React.FC = () => {
                   </BannerUrlContainer>
                 )}
 
-                {collectionUrl && (
+                {collectionProfile?.metadata?.url && (
                   <BannerUrlContainer
-                    href={collectionUrl}
+                    href={collectionProfile?.metadata?.url}
                     target="_blank"
                     rel="noopener noreferrer"
                   >

@@ -67,6 +67,8 @@ import { GridLoader } from "react-spinners";
 import { useWallet } from "@txnlab/use-wallet-react";
 import InfoIcon from "@mui/icons-material/Info";
 import { useName } from "@/hooks/useName";
+import { useEnvoiResolver } from "@/hooks/useEnvoiResolver";
+import { compactAddress } from "@/utils/mp";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -142,9 +144,31 @@ export const Account: React.FC = () => {
   /* Wallet */
   const { activeAccount, signTransactions } = useWallet();
 
-  const { name, avatar, loading } = useName(id);
+  const resolver = useEnvoiResolver();
 
-  console.log({ name, avatar, loading });
+  const { avatar, loading } = useName(id);
+
+  const [loadingProfile, setLoadingProfile] = React.useState(false);
+  const [name, setName] = React.useState<string | null>("");
+  const [profile, setProfile] = React.useState<any>(null);
+  useEffect(() => {
+    if (id) {
+      resolver.http.getNameFromAddress(id).then((res) => {
+        if (!!res) {
+          setName(res);
+          resolver.http.search(res).then((res) => {
+            if (res.length === 1) {
+              setProfile(res[0]);
+            }
+            setLoadingProfile(false);
+          });
+        } else {
+          setName(compactAddress(id));
+          setLoadingProfile(false);
+        }
+      });
+    }
+  }, [id]);
 
   /* Copy to clipboard */
 
@@ -248,11 +272,13 @@ export const Account: React.FC = () => {
           },
         });
         const nfts = [];
+        console.log({ res });
         for (const t of res) {
           // Skip NFTs with collection ID
-          // 797610
-          // 846601
-          if ([846601, 797610].includes(t.contractId)) continue;
+          // 797610 (enVoi Reverse Registrar)
+          // 846601 (enVoi Collection Registrar)
+          // 876578 (enVoi Staking Registrar)
+          if ([846601, 797610, 876578].includes(t.contractId)) continue;
 
           const listing = listings?.find(
             (l: any) =>
@@ -497,7 +523,7 @@ export const Account: React.FC = () => {
           activeAccount.address,
           {
             ...nft,
-            tokenId: Number(nft.tokenId),
+            tokenId: BigInt(nft.tokenId),
             contractId: Number(nft.contractId),
           },
           priceBi.toString(),
@@ -1333,11 +1359,11 @@ export const Account: React.FC = () => {
     <Layout>
       <div style={{ marginTop: "2rem" }}>
         <Stack spacing={2} direction="row">
-          {loading ? (
+          {loadingProfile ? (
             <Skeleton
               variant="circular"
-              width={145}
-              height={145}
+              width={120}
+              height={120}
               sx={{ flexShrink: 0 }}
             />
           ) : (
@@ -1346,10 +1372,10 @@ export const Account: React.FC = () => {
                 background: `linear-gradient(45deg, ${stringToColorCode(
                   String(id)
                 )}, ${isDarkTheme ? "#000" : "#fff"})`,
-                width: "145px",
-                height: "145px",
+                width: "120px",
+                height: "120px",
               }}
-              src={avatar || undefined}
+              src={profile?.metadata?.avatar || undefined}
             >
               {String(id).slice(0, 1)}
             </Avatar>
@@ -1366,7 +1392,11 @@ export const Account: React.FC = () => {
                   <AccountLabel>Account</AccountLabel>
                   <Stack direction="row" gap={1}>
                     <AccountValue>
-                      {!loading ? name : <Skeleton width={100} height={16} />}
+                      {!loadingProfile ? (
+                        name
+                      ) : (
+                        <Skeleton width={100} height={16} />
+                      )}
                     </AccountValue>
                     <ContentCopyIcon
                       onClick={() => {

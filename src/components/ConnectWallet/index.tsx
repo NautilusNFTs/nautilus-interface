@@ -19,6 +19,9 @@ import { CONTRACT } from "ulujs";
 import { namehash } from "@/lib/utils";
 import { stripTrailingZeroBytes } from "@/utils/string";
 import { useName } from "@/hooks/useName";
+import { useEnvoiResolver } from "@/hooks/useEnvoiResolver";
+import { useEffect } from "react";
+import { compactAddress } from "@/utils/mp";
 
 const WalletIcon2 = () => {
   return (
@@ -472,60 +475,20 @@ function BasicMenu() {
     setAnchorEl(null);
   };
 
-  const { name, loading, error } = useName(activeAccount?.address);
+  const resolver = useEnvoiResolver();
 
-  console.log({ name, loading, error });
-
-  /*
+  const [loading, setLoading] = React.useState(false);
   const [displayName, setDisplayName] = React.useState("");
-  React.useEffect(() => {
-    if (!activeAccount) return;
-    const { algodClient } = getAlgorandClients();
-    const ci = new CONTRACT(
-      797608,
-      algodClient,
-      undefined,
-      {
-        name: "vns public resolver",
-        description: "vns public resolver",
-        methods: [
-          {
-            name: "name",
-            description: "get name from resolver",
-            args: [
-              {
-                type: "byte[32]",
-              },
-            ],
-            returns: {
-              type: "byte[256]",
-            },
-          },
-        ],
-        events: [],
-      },
-      {
-        addr: activeAccount.address,
-        sk: new Uint8Array(),
-      }
-    );
-    namehash(`${activeAccount.address}.addr.reverse`).then((node) =>
-      ci.name(node).then((res: { success: boolean; returnValue: any }) => {
-        console.log({ res });
-        if (res.success) {
-          const name = stripTrailingZeroBytes(res.returnValue);
-          setDisplayName(name);
-        } else {
-          setDisplayName(
-            activeAccount.address.slice(0, 4) +
-              "..." +
-              activeAccount.address.slice(-4)
-          );
-        }
-      })
-    );
-  }, [activeAccount]);
-  */
+  useEffect(() => {
+    if (!activeAccount || !resolver) return;
+    setLoading(true);
+    resolver.http
+      .getNameFromAddress(activeAccount?.address)
+      .then((res: any) => {
+        setDisplayName(!!res ? res : compactAddress(activeAccount.address));
+        setLoading(false);
+      });
+  }, [activeAccount, resolver]);
 
   // ---------------------------------------------
   // QUEST
@@ -572,7 +535,7 @@ function BasicMenu() {
           }}
         >
           <AccountDropdownLabel className="light">
-            {loading ? "Loading..." : name || ""}
+            {loading ? "Loading..." : displayName}
           </AccountDropdownLabel>
           <Link
             to={`/wallet/${activeAccount?.address}`}

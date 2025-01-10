@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Layout from "../../layouts/Default";
-import { Box, Grid, Skeleton, Typography } from "@mui/material";
+import { Box, Grid, Skeleton, Typography, Chip, Avatar } from "@mui/material";
 import { Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "../../store/store";
@@ -18,7 +18,7 @@ import CartNftCard from "../../components/CartNFTCard";
 import { getPrices } from "../../store/dexSlice";
 import { CTCINFO_LP_WVOI_VOI } from "../../contants/dex";
 import { getListings } from "../../store/listingSlice";
-import { getRankings } from "../../utils/mp";
+import { compactAddress, getRankings } from "../../utils/mp";
 import { getSmartTokens } from "../../store/smartTokenSlice";
 import Grid2 from "@mui/material/Unstable_Grid2"; // Grid version 2
 import LazyLoad from "react-lazy-load";
@@ -45,6 +45,7 @@ import "swiper/css/pagination";
 import CustomPagination from "../../components/Pagination";
 import { Tabs, Tab } from "@mui/material";
 import { useName } from "@/hooks/useName";
+import { useEnvoiResolver } from "@/hooks/useEnvoiResolver";
 
 const formatPrice = (price: number) => {
   return (price / 1e6).toLocaleString(undefined, {
@@ -306,18 +307,52 @@ const ActivityTableRow = ({
   tokenInfo: any;
   collectionName: string;
 }) => {
-  //const tokenInfo: any = getTokenInfo(sale.collectionId, sale.tokenId);
-  const { fetchName } = useName();
   const metadata = JSON.parse(tokenInfo?.metadata || "{}");
   const [sellerName, setSellerName] = useState<string>("");
-  useEffect(() => {
-    fetchName(sale.seller).then(setSellerName);
-  }, [sale]);
+  const [sellerProfile, setSellerProfile] = useState<any>(null);
   const [buyerName, setBuyerName] = useState<string>("");
+  const [buyerProfile, setBuyerProfile] = useState<any>(null);
+  const resolver = useEnvoiResolver();
   useEffect(() => {
-    fetchName(sale.buyer).then(setBuyerName);
+    resolver.http.getNameFromAddress(sale.seller).then((res) => {
+      if (!!res) {
+        setSellerName(res);
+        resolver.http.search(res).then((res) => {
+          if (res.length === 1) {
+            setSellerProfile(res[0]);
+          }
+        });
+      } else {
+        setSellerName(compactAddress(sale.seller));
+      }
+    });
+    resolver.http.getNameFromAddress(sale.buyer).then((res) => {
+      if (!!res) {
+        setBuyerName(res);
+        resolver.http.search(res).then((res) => {
+          if (res.length === 1) {
+            setBuyerProfile(res[0]);
+          }
+        });
+      } else {
+        setBuyerName(compactAddress(sale.buyer));
+      }
+    });
   }, [sale]);
-  console.log({ sellerName, buyerName });
+  console.log({ sellerProfile, buyerProfile });
+
+  // Add this function to generate a color from an address
+  const getColorFromAddress = (address: string) => {
+    // Create a hash from the address
+    const hash = address.split("").reduce((acc, char) => {
+      return char.charCodeAt(0) + ((acc << 5) - acc);
+    }, 0);
+
+    // Generate HSL color with good saturation and lightness for visibility
+    const h = Math.abs(hash) % 360;
+    return `hsl(${h}, 70%, 50%)`;
+  };
+
   return (
     <TableRow>
       <TableCell>
@@ -375,13 +410,81 @@ const ActivityTableRow = ({
       </TableCell>
       <TableCell>{formatPrice(sale.price)} VOI</TableCell>
       <TableCell>
-        <Link to={`/account/${sale.seller}`}>
-          {sellerName ? sellerName : <Skeleton width={100} height={16} />}
+        <Link to={`/account/${sale.seller}`} style={{ textDecoration: "none" }}>
+          {sellerName ? (
+            <Chip
+              avatar={
+                <Avatar
+                  src={sellerProfile?.metadata?.avatar || undefined}
+                  alt={sellerName}
+                  sx={{
+                    bgcolor: !sellerProfile?.metadata?.avatar
+                      ? compactAddress(sale.seller) === sellerName
+                        ? "silver"
+                        : getColorFromAddress(sale.seller)
+                      : undefined,
+                  }}
+                >
+                  {!sellerProfile?.metadata?.avatar &&
+                    sellerName[0].toUpperCase()}
+                </Avatar>
+              }
+              label={sellerName}
+              variant="outlined"
+              sx={{
+                color: isDarkTheme ? "#fff" : "inherit",
+                borderColor: isDarkTheme
+                  ? "rgba(255, 255, 255, 0.23)"
+                  : "rgba(0, 0, 0, 0.23)",
+                "& .MuiChip-label": {
+                  maxWidth: "120px",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                },
+              }}
+            />
+          ) : (
+            <Skeleton width={100} height={32} />
+          )}
         </Link>
       </TableCell>
       <TableCell>
-        <Link to={`/account/${sale.buyer}`}>
-          {buyerName ? buyerName : <Skeleton width={100} height={16} />}
+        <Link to={`/account/${sale.buyer}`} style={{ textDecoration: "none" }}>
+          {buyerName ? (
+            <Chip
+              avatar={
+                <Avatar
+                  src={buyerProfile?.metadata?.avatar || undefined}
+                  alt={buyerName}
+                  sx={{
+                    bgcolor: !buyerProfile?.metadata?.avatar
+                      ? compactAddress(sale.buyer) == buyerName
+                        ? "silver"
+                        : getColorFromAddress(sale.buyer)
+                      : undefined,
+                  }}
+                >
+                  {!buyerProfile?.metadata?.avatar &&
+                    buyerName[0].toUpperCase()}
+                </Avatar>
+              }
+              label={buyerName}
+              variant="outlined"
+              sx={{
+                color: isDarkTheme ? "#fff" : "inherit",
+                borderColor: isDarkTheme
+                  ? "rgba(255, 255, 255, 0.23)"
+                  : "rgba(0, 0, 0, 0.23)",
+                "& .MuiChip-label": {
+                  maxWidth: "120px",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                },
+              }}
+            />
+          ) : (
+            <Skeleton width={100} height={32} />
+          )}
         </Link>
       </TableCell>
       <TableCell>{moment(sale.timestamp * 1000).fromNow()}</TableCell>
@@ -392,6 +495,8 @@ const ActivityTableRow = ({
 export const Home: React.FC = () => {
   /* Dispatch */
   const dispatch = useDispatch();
+
+  const resolver = useEnvoiResolver();
 
   /* Smart Tokens */
   const smartTokens = useSelector((state: any) => state.smartTokens.tokens);
@@ -611,120 +716,121 @@ export const Home: React.FC = () => {
     currentPage * salesPerPage
   );
 
-  const [topSellers, setTopSellers] = useState<SellerStats[]>([]);
-  const [isLoadingTopSellers, setIsLoadingTopSellers] = useState(false);
+  // const [topSellers, setTopSellers] = useState<SellerStats[]>([]);
+  // const [isLoadingTopSellers, setIsLoadingTopSellers] = useState(false);
 
   // Add pagination state for top sellers
   const [currentTopSellersPage, setCurrentTopSellersPage] = useState(1);
   const sellersPerPage = 5;
 
   // Add effect to fetch and process sales data for top sellers
-  useEffect(() => {
-    const fetchTopSellers = async () => {
-      setIsLoadingTopSellers(true);
-      try {
-        const response = await axios.get(
-          "https://mainnet-idx.nautilus.sh/nft-indexer/v1/mp/sales?sort=-round&limit=1000"
-        );
+  // useEffect(() => {
+  //   const fetchTopSellers = async () => {
+  //     setIsLoadingTopSellers(true);
+  //     try {
+  //       const response = await axios.get(
+  //         "https://mainnet-idx.nautilus.sh/nft-indexer/v1/mp/sales?sort=-round&limit=1000"
+  //       );
 
-        // Group sales by seller and calculate totals
-        const sellerMap = response.data.sales.reduce(
-          (acc: Record<string, SellerStats>, sale: any) => {
-            if (!acc[sale.seller]) {
-              acc[sale.seller] = {
-                seller: sale.seller,
-                totalSales: 0,
-                totalProceeds: 0,
-              };
-            }
-            acc[sale.seller].totalSales += 1;
-            acc[sale.seller].totalProceeds += Number(sale.price);
-            return acc;
-          },
-          {}
-        );
+  //       // Group sales by seller and calculate totals
+  //       const sellerMap = response.data.sales.reduce(
+  //         (acc: Record<string, SellerStats>, sale: any) => {
+  //           if (!acc[sale.seller]) {
+  //             acc[sale.seller] = {
+  //               seller: sale.seller,
+  //               totalSales: 0,
+  //               totalProceeds: 0,
+  //             };
+  //           }
+  //           acc[sale.seller].totalSales += 1;
+  //           acc[sale.seller].totalProceeds += Number(sale.price);
+  //           return acc;
+  //         },
+  //         {}
+  //       );
 
-        // Convert to array and sort by total sales count
-        const sortedSellers = Object.values(sellerMap)
-          .sort((a: SellerStats, b: SellerStats) => b.totalSales - a.totalSales)
-          .slice(0, 20);
+  //       // Convert to array and sort by total sales count
+  //       const sortedSellers = Object.values(sellerMap)
+  //         .sort((a: SellerStats, b: SellerStats) => b.totalSales - a.totalSales)
+  //         .slice(0, 20);
 
-        setTopSellers(sortedSellers);
-      } catch (error) {
-        console.error("Error fetching top sellers:", error);
-      } finally {
-        setIsLoadingTopSellers(false);
-      }
-    };
+  //       setTopSellers(sortedSellers);
+  //     } catch (error) {
+  //       console.error("Error fetching top sellers:", error);
+  //     } finally {
+  //       setIsLoadingTopSellers(false);
+  //     }
+  //   };
 
-    fetchTopSellers();
-  }, []);
+  //   fetchTopSellers();
+  // }, []);
 
   // Calculate pagination for top sellers
-  const totalSellerPages = Math.ceil(topSellers.length / sellersPerPage);
-  const paginatedSellers = topSellers.slice(
-    (currentTopSellersPage - 1) * sellersPerPage,
-    currentTopSellersPage * sellersPerPage
-  );
+  // const totalSellerPages = Math.ceil(topSellers.length / sellersPerPage);
+  // const paginatedSellers = topSellers.slice(
+  //   (currentTopSellersPage - 1) * sellersPerPage,
+  //   currentTopSellersPage * sellersPerPage
+  // );
 
-  const [topBuyers, setTopBuyers] = useState<BuyerStats[]>([]);
-  const [isLoadingTopBuyers, setIsLoadingTopBuyers] = useState(false);
-  const [currentTopBuyersPage, setCurrentTopBuyersPage] = useState(1);
-  const buyersPerPage = 5;
+  // const [topBuyers, setTopBuyers] = useState<BuyerStats[]>([]);
+  // const [isLoadingTopBuyers, setIsLoadingTopBuyers] = useState(false);
+  // const [currentTopBuyersPage, setCurrentTopBuyersPage] = useState(1);
+  // const buyersPerPage = 5;
 
   // Add effect to fetch and process sales data for top buyers
-  useEffect(() => {
-    const fetchTopBuyers = async () => {
-      setIsLoadingTopBuyers(true);
-      try {
-        const response = await axios.get(
-          "https://mainnet-idx.nautilus.sh/nft-indexer/v1/mp/sales?sort=-round&limit=1000"
-        );
 
-        // Group sales by buyer and calculate totals
-        const buyerMap = response.data.sales.reduce(
-          (acc: Record<string, BuyerStats>, sale: any) => {
-            if (!acc[sale.buyer]) {
-              acc[sale.buyer] = {
-                buyer: sale.buyer,
-                totalPurchases: 0,
-                totalSpent: 0,
-              };
-            }
-            acc[sale.buyer].totalPurchases += 1;
-            acc[sale.buyer].totalSpent += Number(sale.price);
-            return acc;
-          },
-          {}
-        );
+  // useEffect(() => {
+  //   const fetchTopBuyers = async () => {
+  //     setIsLoadingTopBuyers(true);
+  //     try {
+  //       const response = await axios.get(
+  //         "https://mainnet-idx.nautilus.sh/nft-indexer/v1/mp/sales?sort=-round&limit=1000"
+  //       );
 
-        // Convert to array and sort by total purchases
-        const sortedBuyers = Object.values(buyerMap)
-          .sort(
-            (a: BuyerStats, b: BuyerStats) =>
-              b.totalPurchases - a.totalPurchases
-          )
-          .slice(0, 20); // Get top 20 buyers for pagination
+  //       // Group sales by buyer and calculate totals
+  //       const buyerMap = response.data.sales.reduce(
+  //         (acc: Record<string, BuyerStats>, sale: any) => {
+  //           if (!acc[sale.buyer]) {
+  //             acc[sale.buyer] = {
+  //               buyer: sale.buyer,
+  //               totalPurchases: 0,
+  //               totalSpent: 0,
+  //             };
+  //           }
+  //           acc[sale.buyer].totalPurchases += 1;
+  //           acc[sale.buyer].totalSpent += Number(sale.price);
+  //           return acc;
+  //         },
+  //         {}
+  //       );
 
-        setTopBuyers(sortedBuyers as BuyerStats[]);
-      } catch (error) {
-        console.error("Error fetching top buyers:", error);
-      } finally {
-        setIsLoadingTopBuyers(false);
-      }
-    };
+  //       // Convert to array and sort by total purchases
+  //       const sortedBuyers = Object.values(buyerMap)
+  //         .sort(
+  //           (a: BuyerStats, b: BuyerStats) =>
+  //             b.totalPurchases - a.totalPurchases
+  //         )
+  //         .slice(0, 20); // Get top 20 buyers for pagination
 
-    fetchTopBuyers();
-  }, []);
+  //       setTopBuyers(sortedBuyers as BuyerStats[]);
+  //     } catch (error) {
+  //       console.error("Error fetching top buyers:", error);
+  //     } finally {
+  //       setIsLoadingTopBuyers(false);
+  //     }
+  //   };
+
+  //   fetchTopBuyers();
+  // }, []);
 
   // Calculate pagination for top buyers
-  const totalBuyerPages = Math.ceil(topBuyers.length / buyersPerPage);
-  const paginatedBuyers = topBuyers.slice(
-    (currentTopBuyersPage - 1) * buyersPerPage,
-    currentTopBuyersPage * buyersPerPage
-  );
+  // const totalBuyerPages = Math.ceil(topBuyers.length / buyersPerPage);
+  // const paginatedBuyers = topBuyers.slice(
+  //   (currentTopBuyersPage - 1) * buyersPerPage,
+  //   currentTopBuyersPage * buyersPerPage
+  // );
 
-  const NEW_LISTINGS_COUNT = 5; // New constant for number of listings to show
+  //const NEW_LISTINGS_COUNT = 5; // New constant for number of listings to show
 
   const [topCollections, setTopCollections] = useState<
     {
@@ -1206,7 +1312,7 @@ export const Home: React.FC = () => {
           </ActivitySection>
 
           {/* Top Sellers Section */}
-          {false && (
+          {/*false && (
             <ActivitySection>
               <ActivityTitle $isDarkTheme={isDarkTheme}>
                 Top Sellers
@@ -1273,8 +1379,6 @@ export const Home: React.FC = () => {
                   </TableBody>
                 </Table>
               </StyledTableContainer>
-
-              {/* Add Pagination for Top Sellers */}
               {topSellers.length > sellersPerPage && (
                 <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
                   <CustomPagination
@@ -1286,10 +1390,10 @@ export const Home: React.FC = () => {
                 </Box>
               )}
             </ActivitySection>
-          )}
+          )*/}
 
           {/* Top Buyers Section */}
-          {false && (
+          {/*false && (
             <ActivitySection>
               <ActivityTitle $isDarkTheme={isDarkTheme}>
                 Top Buyers
@@ -1356,8 +1460,6 @@ export const Home: React.FC = () => {
                   </TableBody>
                 </Table>
               </StyledTableContainer>
-
-              {/* Add Pagination for Top Buyers */}
               {topBuyers.length > buyersPerPage && (
                 <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
                   <CustomPagination
@@ -1369,7 +1471,7 @@ export const Home: React.FC = () => {
                 </Box>
               )}
             </ActivitySection>
-          )}
+          )*/}
         </div>
       ) : (
         <div>

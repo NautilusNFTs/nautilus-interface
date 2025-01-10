@@ -1,11 +1,17 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import LightLogo from "/src/static/logo-light.svg";
 import DarkLogo from "/src/static/logo-dark.svg";
 import { RootState } from "../../store/store";
 import { useSelector } from "react-redux";
 import ThemeSelector from "../ThemeSelector";
-import { Button, Stack, Tooltip, CircularProgress } from "@mui/material";
+import {
+  Button,
+  Stack,
+  Tooltip,
+  CircularProgress,
+  Avatar,
+} from "@mui/material";
 import { useCopyToClipboard } from "usehooks-ts";
 import { toast } from "react-toastify";
 import ConnectWallet from "../ConnectWallet";
@@ -38,6 +44,7 @@ import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import { useOwnedStakingContract } from "@/hooks/staking";
 import { useOwnedARC72Token } from "@/hooks/arc72";
 import { getStakingWithdrawableAmount } from "@/utils/staking";
+import { useEnvoiResolver } from "@/hooks/useEnvoiResolver";
 
 const AccountIcon = () => {
   return (
@@ -64,14 +71,14 @@ const WalletIcon2 = () => {
   const { activeAccount } = useWallet();
 
   return (
-    <div 
+    <div
       onClick={(e) => {
         e.stopPropagation();
         if (activeAccount) {
           navigate(`/wallet/${activeAccount.address}`);
         }
       }}
-      style={{ cursor: activeAccount ? 'pointer' : 'default' }}
+      style={{ cursor: activeAccount ? "pointer" : "default" }}
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -98,6 +105,27 @@ const Navbar: React.FC = () => {
   /* Wallet */
 
   const { activeAccount, signTransactions } = useWallet();
+
+  const resolver = useEnvoiResolver();
+
+  const [accountName, setAccountName] = useState<string | null>(null);
+  const [accountProfile, setAccountProfile] = useState<any>(null);
+  useEffect(() => {
+    if (activeAccount) {
+      resolver.http
+        .getNameFromAddress(activeAccount.address)
+        .then((result: string) => {
+          if (!!result) {
+            setAccountName(result);
+            resolver.http.search(result).then((results: any[]) => {
+              if (results.length === 1) {
+                setAccountProfile(results[0]);
+              }
+            });
+          }
+        });
+    }
+  }, [activeAccount]);
 
   // const { data: stakingContractData, isLoading: stakingContractLoading } =
   //   useOwnedStakingContract(activeAccount?.address);
@@ -352,7 +380,7 @@ const Navbar: React.FC = () => {
                         }}
                       >
                         <img src={VOIIcon} style={{ height: "12px" }} />
-                        <div>
+                        <div style={{ flexShrink: 0 }}>
                           {(
                             (accountInfoData.amount -
                               accountInfoData["min-balance"]) /
@@ -366,6 +394,7 @@ const Navbar: React.FC = () => {
                               size="small"
                               variant="contained"
                               sx={{
+                                flexShrink: 0,
                                 borderRadius: "25px",
                                 color: isDarkTheme ? "#fff" : "inherit",
                                 backgroundColor: isDarkTheme
@@ -424,9 +453,16 @@ const Navbar: React.FC = () => {
             <AccountContainer>
               {activeAccount ? (
                 <Link to={`/account/${activeAccount?.address}`}>
-                  <AccountIconContainer>
-                    <AccountIcon />
-                  </AccountIconContainer>
+                  {accountProfile?.metadata?.avatar ? (
+                    <Avatar
+                      src={accountProfile?.metadata?.avatar}
+                      sx={{ width: 47, height: 47 }}
+                    />
+                  ) : (
+                    <AccountIconContainer>
+                      <AccountIcon />
+                    </AccountIconContainer>
+                  )}
                 </Link>
               ) : null}
               <div className="hidden md:block">

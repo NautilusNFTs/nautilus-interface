@@ -18,7 +18,7 @@ import { toast } from "react-toastify";
 
 import algosdk from "algosdk";
 //import { MarketplaceContext } from "../../store/MarketplaceContext";
-import { decodePrice, decodeTokenId } from "../../utils/mp";
+import { compactAddress, decodePrice, decodeTokenId } from "../../utils/mp";
 import NftCard from "../../components/NFTCard";
 import BuySaleModal, { multiplier } from "../../components/modals/BuySaleModal";
 // @ts-ignore
@@ -43,6 +43,7 @@ import { useWallet } from "@txnlab/use-wallet-react";
 import { TOKEN_WVOI } from "@/contants/tokens";
 import { useAccountInfo } from "../Navbar/hooks";
 import { useStakingContract } from "@/hooks/staking";
+import { useEnvoiResolver } from "@/hooks/useEnvoiResolver";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -271,6 +272,8 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
 }) => {
   /* Wallet */
   const { activeAccount, signTransactions } = useWallet();
+  // EnVoi
+  const resolver = useEnvoiResolver();
   /* Modal */
   const [openBuyModal, setOpenBuyModal] = React.useState(false);
   const [isBuying, setIsBuying] = React.useState(false);
@@ -1561,16 +1564,37 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
       ? nft.metadata?.name
       : nft.metadata?.name + " #" + nft.tokenId;
 
+  const [loadingOwnerProfile, setLoadingOwnerProfile] = useState(false);
   const [owner, setOwner] = useState<string | undefined>(nft.owner);
+  const [ownerName, setOwnerName] = useState<string>("");
+  const [ownerProfile, setOwnerProfile] = useState<any>(null);
   useEffect(() => {
     if (!nft) return;
+    setLoadingOwnerProfile(true);
     const ci = new arc72(nft.contractId, algodClient, indexerClient);
-    ci.arc72_ownerOf(nft.tokenId).then((res: any) => {
+    const tokenId = Number(nft.tokenId);
+    ci.arc72_ownerOf(tokenId).then((res: any) => {
       if (res.success) {
-        setOwner(res.returnValue);
+        const owner = res.returnValue;
+        setOwner(owner);
+        resolver.http.getNameFromAddress(owner).then((res) => {
+          if (!!res) {
+            setOwnerName(res);
+            resolver.http.search(res).then((res) => {
+              if (res.length === 1) {
+                setOwnerProfile(res[0]);
+                setLoadingOwnerProfile(false);
+              }
+            });
+          } else {
+            setOwnerName(compactAddress(owner));
+            setLoadingOwnerProfile(false);
+          }
+        });
       }
     });
   }, [nft]);
+  console.log({ loadingOwnerProfile, ownerName, ownerProfile });
 
   const discount = useMemo(() => {
     if (
@@ -1655,9 +1679,12 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
               <NFTName style={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
                 {displayName}
               </NFTName>
-              {nft.owner ? (
+              {loadingOwnerProfile ? (
+                <Skeleton variant="text" width={150} height={24} />
+              ) : (
                 <AvatarWithOwnerName direction="row" style={{ gap: "6px" }}>
                   <Avatar
+                    src={ownerProfile?.metadata?.avatar || undefined}
                     sx={{
                       height: "24px",
                       width: "24px",
@@ -1676,13 +1703,11 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
                           isDarkTheme ? "owner-value-dark" : "owner-value-light"
                         }
                       >
-                        {nft.ownerName}
+                        {ownerName}
                       </OwnerValue>
                     </StyledLink>
                   </Stack>
                 </AvatarWithOwnerName>
-              ) : (
-                <Skeleton variant="text" width={150} height={24} />
               )}
 
               <ProjectLinkContainer>

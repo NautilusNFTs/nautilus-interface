@@ -101,3 +101,12 @@ input:focus-visible {
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes metallicShine {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}

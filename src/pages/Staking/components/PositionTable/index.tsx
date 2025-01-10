@@ -13,6 +13,11 @@ import {
   Box,
   useTheme,
   styled,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
@@ -21,6 +26,10 @@ import PositionRow from "../PositionRow";
 import Pagination from "@/components/Pagination";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import { abi, CONTRACT } from "ulujs";
+import { getAlgorandClients } from "@/wallets";
+import { useWallet } from "@txnlab/use-wallet-react";
+import { getStakingWithdrawableAmount } from "@/utils/staking";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -57,14 +66,21 @@ interface ResponsiveTableProps {
 }
 
 type SortDirection = "asc" | "desc" | null;
-type SortColumn = "contractId" | "totalStaked" | "unlock" | "claimable" | "expires" | null;
+type SortColumn =
+  | "contractId"
+  | "totalStaked"
+  | "unlock"
+  | "claimable"
+  | "expires"
+  | null;
 
 const StyledTabs = styled(Tabs)<{ $isDarkTheme: boolean }>`
   .MuiTab-root {
-    color: ${props => props.$isDarkTheme ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)'};
+    color: ${(props) =>
+      props.$isDarkTheme ? "rgba(255, 255, 255, 0.5)" : "rgba(0, 0, 0, 0.5)"};
     font-family: "Plus Jakarta Sans";
     font-weight: 600;
-    
+
     &.Mui-selected {
       color: #9933ff;
     }
@@ -79,6 +95,7 @@ const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
   stakingContracts,
   arc72Tokens,
 }) => {
+  const { activeAccount, signTransactions } = useWallet();
   const { isDarkTheme } = useSelector((state: RootState) => state.theme);
   const theme = useTheme();
   const pageSize = 10;
@@ -230,11 +247,196 @@ const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
   const totalPages2 = Math.ceil(sortedArc72Tokens.length / pageSize);
   const [currentPage2, setCurrentPage2] = React.useState(1);
 
+  // Add state for modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [withdrawableAmount, setWithdrawableAmount] = useState(0);
+
+  // Calculate total withdrawable amount based on active tab
+  const handleWithdrawAllClick = async () => {
+    if (!activeAccount) return;
+    const { algodClient } = getAlgorandClients();
+    let total = BigInt(0);
+    if (value === 0) {
+      // Only calculate for active staking contracts tab
+      // total = sortedStakingContracts
+      //   .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+      //   .reduce((sum, ctc) => sum + Number(ctc.withdrawable || 0), 0);
+      // build withdraw transactions
+      const buildN = [];
+      let withdrawableAmount;
+      for await (const ctc of sortedStakingContracts) {
+        const withdrawable = await getStakingWithdrawableAmount(
+          algodClient,
+          ctc.contractId,
+          ctc.global_owner
+        );
+        total += BigInt(withdrawable);
+        if (withdrawable > 0) {
+          const builder = new CONTRACT(
+            ctc.contractId,
+            algodClient,
+            undefined,
+            {
+              name: "NautilusVoiStaking",
+              methods: [
+                {
+                  name: "withdraw",
+                  args: [{ type: "uint64", name: "amount" }],
+                  readonly: false,
+                  returns: { type: "uint64" },
+                  desc: "Withdraw funds from contract.",
+                },
+              ],
+              events: [],
+            },
+            { addr: activeAccount.address, sk: new Uint8Array(0) },
+            true,
+            false,
+            true
+          );
+          const txnO = await builder.withdraw(BigInt(withdrawable));
+          buildN.push({
+            ...txnO,
+          });
+        }
+      }
+      const ci = new CONTRACT(0, algodClient, undefined, abi.custom, {
+        addr: activeAccount.address,
+        sk: new Uint8Array(0),
+      });
+      ci.setFee(2000);
+      ci.setEnableGroupResourceSharing(true);
+      ci.setExtraTxns(buildN.slice(0, 8).map((txn) => txn.obj));
+      //ci.setGroupResourceSharingStrategy("merge");
+      const customR = await ci.custom();
+      const stxns = await signTransactions(
+        customR.txns.map(
+          (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
+        )
+      );
+      const res = await algodClient
+        .sendRawTransaction(stxns as Uint8Array[])
+        .do();
+      console.log(res);
+    } else {
+      const buildN: any[] = [];
+      for await (const nft of sortedArc72Tokens) {
+        try {
+          const withdrawable = await getStakingWithdrawableAmount(
+            algodClient,
+            Number(nft.tokenId),
+            nft.staking?.global_owner
+          );
+          console.log(withdrawable);
+          total += BigInt(withdrawable);
+          if (withdrawable > BigInt(0)) {
+            const builder = new CONTRACT(
+              nft.contractId,
+              algodClient,
+              undefined,
+              {
+                name: "NautilusVoiStaking",
+                methods: [
+                  {
+                    name: "withdraw",
+                    args: [
+                      {
+                        type: "uint64",
+                        name: "tokenId",
+                      },
+                      {
+                        type: "uint64",
+                        name: "amount",
+                      },
+                    ],
+                    readonly: false,
+                    returns: {
+                      type: "void",
+                    },
+                    desc: "Withdraw funds from contract.",
+                  },
+                ],
+                events: [],
+              },
+              { addr: activeAccount.address, sk: new Uint8Array(0) },
+              true,
+              false,
+              true
+            );
+            const txnO = await builder.withdraw(
+              Number(nft.tokenId),
+              BigInt(withdrawable)
+            );
+            console.log({ txnO });
+            buildN.push({
+              ...txnO,
+              accounts: [
+                "RTKWX3FTDNNIHMAWHK5SDPKH3VRPPW7OS5ZLWN6RFZODF7E22YOBK2OGPE",
+              ],
+              foreignApp: [Number(nft.tokenId)],
+            });
+          }
+        } catch (e) {
+          console.log(e);
+        }
+      }
+      console.log(buildN);
+      const ci = new CONTRACT(0, algodClient, undefined, abi.custom, {
+        addr: activeAccount.address,
+        sk: new Uint8Array(0),
+      });
+      ci.setFee(8000);
+      ci.setEnableGroupResourceSharing(true);
+      ci.setExtraTxns(buildN.slice(0, 7).map((txn) => txn.obj));
+      //ci.setGroupResourceSharingStrategy("merge");
+      const customR = await ci.custom();
+      console.log(customR);
+      const stxns = await signTransactions(
+        customR.txns.map(
+          (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
+        )
+      );
+      const res = await algodClient
+        .sendRawTransaction(stxns as Uint8Array[])
+        .do();
+      console.log(res);
+    }
+    setWithdrawableAmount(Number(total) / 10 ** 6);
+    setIsModalOpen(true);
+  };
+
+  // Add modal JSX before the return statement
+  const withdrawModal = (
+    <Dialog open={isModalOpen} onClose={() => setIsModalOpen(false)}>
+      <DialogTitle>Withdraw All Tokens</DialogTitle>
+      <DialogContent>
+        <Typography>Total withdrawable amount: {withdrawableAmount}</Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setIsModalOpen(false)}>Cancel</Button>
+        <Button
+          onClick={() => {
+            // Add your withdraw logic here
+            setIsModalOpen(false);
+          }}
+          sx={{
+            backgroundColor: "#9933ff",
+            color: "white",
+            "&:hover": { backgroundColor: "#7f2adb" },
+          }}
+        >
+          Confirm Withdraw
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+
   return (
     <>
-      <StyledTabs 
-        value={value} 
-        onChange={handleChange} 
+      {withdrawModal}
+      <StyledTabs
+        value={value}
+        onChange={handleChange}
         aria-label="position tabs"
         $isDarkTheme={isDarkTheme}
       >
@@ -242,6 +444,18 @@ const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
         <Tab label="Tokens" />
       </StyledTabs>
       <CustomTabPanel value={value} index={0}>
+        <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+          <Button
+            variant="contained"
+            onClick={handleWithdrawAllClick}
+            sx={{
+              backgroundColor: "#9933ff",
+              "&:hover": { backgroundColor: "#7f2adb" },
+            }}
+          >
+            Withdraw All
+          </Button>
+        </Box>
         <TableContainer component={Paper} style={tableStyle}>
           <Table>
             <TableHead>
@@ -294,6 +508,18 @@ const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
         />
       </CustomTabPanel>
       <CustomTabPanel value={value} index={1}>
+        <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+          <Button
+            variant="contained"
+            onClick={handleWithdrawAllClick}
+            sx={{
+              backgroundColor: "#9933ff",
+              "&:hover": { backgroundColor: "#7f2adb" },
+            }}
+          >
+            Withdraw All
+          </Button>
+        </Box>
         <TableContainer component={Paper} style={tableStyle}>
           <Table>
             <TableHead>

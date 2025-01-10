@@ -533,11 +533,15 @@ const getCollectionName = (collection: CollectionData) => {
     if (!collection.firstToken?.metadata) return `#${collection.contractId}`;
     const metadata = JSON.parse(collection.firstToken.metadata);
     // Try to get collection name from standard metadata fields
-    const name = metadata.collection_name || metadata.collectionName || metadata.collection || metadata.name;
+    const name =
+      metadata.collection_name ||
+      metadata.collectionName ||
+      metadata.collection ||
+      metadata.name;
     if (!name) return `#${collection.contractId}`;
-    
+
     // Remove trailing numbers with optional # prefix
-    const cleanedName = name.replace(/[#\s]*\d+$/, '').trim();
+    const cleanedName = name.replace(/[#\s]*\d+$/, "").trim();
     return cleanedName || `#${collection.contractId}`;
   } catch (e) {
     return `#${collection.contractId}`;
@@ -624,7 +628,9 @@ export const Listings: React.FC = () => {
     );
   }, [listings, smartTokens]);
 
-  const [selectedCollections, setSelectedCollections] = useState<CollectionData[]>([]);
+  const [selectedCollections, setSelectedCollections] = useState<
+    CollectionData[]
+  >([]);
 
   const filteredListings = useMemo(() => {
     const listings = normalListings.map((listing: ListingI) => {
@@ -716,7 +722,9 @@ export const Listings: React.FC = () => {
           (`${currency}` === "" ||
             currency.split(",").map(Number).includes(el.currency)) &&
           (selectedCollections.length === 0 ||
-            selectedCollections.some(c => c.contractId === el.collectionId)) &&
+            selectedCollections.some(
+              (c) => c.contractId === el.collectionId
+            )) &&
           el.price / 1e6 >= (min ? parseInt(min) : 0) &&
           el.price / 1e6 <= (max ? parseInt(max) : Number.MAX_SAFE_INTEGER)
       );
@@ -727,7 +735,9 @@ export const Listings: React.FC = () => {
           (`${currency}` === "" ||
             currency.split(",").map(Number).includes(el.currency)) &&
           (selectedCollections.length === 0 ||
-            selectedCollections.some(c => c.contractId === el.collectionId)) &&
+            selectedCollections.some(
+              (c) => c.contractId === el.collectionId
+            )) &&
           el.relevancy > 0 &&
           el.price / 1e6 >= (min ? parseInt(min) : 0) &&
           el.price / 1e6 <= (max ? parseInt(max) : Number.MAX_SAFE_INTEGER)
@@ -748,6 +758,9 @@ export const Listings: React.FC = () => {
   const [displayedItems, setDisplayedItems] = useState<NFTIndexerListingI[]>(
     []
   );
+
+  console.log({ displayedItems });
+
   const [hasMore, setHasMore] = useState(true);
   const itemsPerLoad = 50;
 
@@ -1001,7 +1014,9 @@ export const Listings: React.FC = () => {
             ))
           }
           getOptionLabel={(collection) => getCollectionName(collection)}
-          isOptionEqualToValue={(option, value) => option.contractId === value.contractId}
+          isOptionEqualToValue={(option, value) =>
+            option.contractId === value.contractId
+          }
           filterSelectedOptions
           componentsProps={{
             popper: {
