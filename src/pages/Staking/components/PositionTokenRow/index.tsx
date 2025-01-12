@@ -19,6 +19,9 @@ import {
   MenuItem,
   CircularProgress,
   Slider,
+  Table,
+  TableHead,
+  TableBody,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import Skeleton from "@mui/material/Skeleton";
@@ -67,6 +70,14 @@ interface PositionTokenRowProps {
   arc72TokensLength: number;
   lastRowStyle: React.CSSProperties;
   cellStyle: React.CSSProperties;
+}
+
+interface BlockProductionData {
+  start_date: string;
+  end_date: string;
+  proposers: Record<string, number>;
+  total_blocks: number;
+  ballast_blocks: number;
 }
 
 const ParticipateModal: React.FC<{
@@ -382,64 +393,76 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
 
   const handleClaim = async () => {
     if (!activeAccount) return;
-    const apid = Number(nft.contractId);
-    const ci = new CONTRACT(
-      apid,
-      algodClient,
-      undefined,
-      {
-        name: "NautilusVoiStaking",
-        methods: [
-          {
-            name: "withdraw",
-            args: [
-              {
-                type: "uint64",
-                name: "tokenId",
+    setIsWithdrawLoading(true);
+    try {
+      const apid = Number(nft.contractId);
+      const ci = new CONTRACT(
+        apid,
+        algodClient,
+        undefined,
+        {
+          name: "NautilusVoiStaking",
+          methods: [
+            {
+              name: "withdraw",
+              args: [
+                {
+                  type: "uint64",
+                  name: "tokenId",
+                },
+                {
+                  type: "uint64",
+                  name: "amount",
+                },
+              ],
+              readonly: false,
+              returns: {
+                type: "void",
               },
-              {
-                type: "uint64",
-                name: "amount",
-              },
-            ],
-            readonly: false,
-            returns: {
-              type: "void",
+              desc: "Withdraw funds from contract.",
             },
-            desc: "Withdraw funds from contract.",
-          },
-        ],
-        events: [],
-      },
-      {
-        addr: activeAccount.address,
-        sk: new Uint8Array(0),
+          ],
+          events: [],
+        },
+        {
+          addr: activeAccount.address,
+          sk: new Uint8Array(0),
+        }
+      );
+      ci.setFee(5000);
+      const withdrawR2 = await ci.withdraw(
+        Number(nft.tokenId),
+        BigInt(withdrawAmount * 1e6)  // Convert VOI to microVOI
+      );
+      if (!withdrawR2.success) {
+        console.error({ withdrawR2 });
+        throw new Error("withdraw failed in simulate");
       }
-    );
-    ci.setFee(5000);
-    const withdrawR2 = await ci.withdraw(
-      Number(nft.tokenId),
-      BigInt(data?.withdrawable || "0")
-    );
-    if (!withdrawR2.success) {
-      console.error({ withdrawR2 });
-      throw new Error("withdraw failed in simulate");
+      const stxns = await signTransactions(
+        withdrawR2.txns.map(
+          (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
+        )
+      );
+      const { txId } = await algodClient
+        .sendRawTransaction(stxns as Uint8Array[])
+        .do();
+      await algosdk.waitForConfirmation(algodClient, txId, 4);
+      await refetch();
+      toast.success("Successfully withdrawn funds");
+      setIsWithdrawModalOpen(false);
+      setWithdrawAmount(0);
+      party.confetti(document.body, {
+        count: party.variation.range(200, 300),
+        size: party.variation.range(1, 1.4),
+      });
+    } catch (error) {
+      console.error("Error withdrawing:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to withdraw funds"
+      );
+    } finally {
+      setIsWithdrawLoading(false);
     }
-    const stxns = await signTransactions(
-      withdrawR2.txns.map(
-        (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
-      )
-    );
-    const { txId } = await algodClient
-      .sendRawTransaction(stxns as Uint8Array[])
-      .do();
-    await algosdk.waitForConfirmation(algodClient, txId, 4);
-    await refetch();
-    toast.success("Claimed");
-    party.confetti(document.body, {
-      count: party.variation.range(200, 300),
-      size: party.variation.range(1, 1.4),
-    });
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -647,6 +670,29 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
     }
   };
 
+  const fetchBlockProductionData = async (contractAddress: string) => {
+    setIsLoadingBlockData(true);
+    try {
+      const response = await fetch(
+        `https://api.voirewards.com/proposers/index_main_3.php?action=epoch-summary&wallet=${contractAddress}`
+      );
+      const data = await response.json();
+      setBlockProductionData(data.snapshots || []);
+    } catch (error) {
+      console.error("Error fetching block production data:", error);
+      toast.error("Failed to fetch block production data");
+    } finally {
+      setIsLoadingBlockData(false);
+    }
+  };
+
+  const transformDataForGraph = (data: BlockProductionData[]) => {
+    return data.map((snapshot, index) => ({
+      count: snapshot.proposers[nft.staking.contractAddress] || 0,
+      label: `${index}`, // Most recent period will be Period 1
+    }));
+  };
+
   return (
     <>
       <TableRow
@@ -787,6 +833,17 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
               {renderExpirationCell()}
             </TableCell>
             <TableCell style={cellStyleWithColor} align="right">
+              <Typography
+                variant="body2"
+                sx={{
+                  color: isDarkTheme ? "white" : "black",
+                  fontWeight: 500,
+                }}
+              >
+                {blocksData?.getProposerBlocks(data?.contractAddress)}
+              </Typography>
+            </TableCell>
+            <TableCell style={cellStyleWithColor} align="right">
               <Box
                 sx={{
                   display: "flex",
@@ -829,9 +886,7 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
                 </Typography>
               </Box>
             </TableCell>
-            <TableCell style={cellStyleWithColor} align="right">
-              {blocksData?.getProposerBlocks(data?.contractAddress)}
-            </TableCell>
+
             <TableCell style={cellStyleWithColor} align="right">
               <Button
                 id="actions-button"
@@ -873,11 +928,15 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
                     <ListItemText primary="Withdraw" />
                   </MenuItem>
                 )}
-                <MenuItem onClick={() => setIsBlockProductionModalOpen(true)}>
+                <MenuItem onClick={() => {
+                  fetchBlockProductionData(nft.staking.contractAddress);
+                  setIsBlockProductionModalOpen(true);
+                  setAnchorEl(null);
+                }}>
                   <ListItemIcon>
                     <BarChart3Icon />
                   </ListItemIcon>
-                  <ListItemText primary="Block Production" />
+                  <ListItemText primary="View Block Production" />
                 </MenuItem>
                 <MenuItem onClick={() => setIsDelegateModalOpen(true)}>
                   <ListItemIcon>
@@ -1017,8 +1076,116 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
         fullWidth
         open={isWithdrawModalOpen}
         onClose={() => setIsWithdrawModalOpen(false)}
+        PaperProps={{
+          sx: {
+            backgroundColor: isDarkTheme
+              ? "rgba(30, 30, 30, 0.95)"
+              : "rgba(255, 255, 255, 0.95)",
+            backdropFilter: "blur(10px)",
+            borderRadius: "16px",
+          },
+        }}
       >
-        {/* ... same withdraw modal content ... */}
+        <DialogTitle>
+          <Typography variant="h6" color={isDarkTheme ? "#FFFFFF" : undefined}>
+            Withdraw VOI
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, py: 2 }}>
+            {isWithdrawLoading ? (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <CircularProgress
+                  size={100}
+                  sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                />
+                <Typography
+                  variant="h6"
+                  color={isDarkTheme ? "#FFFFFF" : undefined}
+                >
+                  Processing withdrawal...
+                </Typography>
+              </Box>
+            ) : (
+              <>
+                <Typography color={isDarkTheme ? "#FFFFFF" : undefined}>
+                  Select amount to withdraw: {withdrawAmount.toFixed(6)} VOI
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <Slider
+                    value={withdrawAmount}
+                    onChange={(_, value) => setWithdrawAmount(Number(value))}
+                    min={0}
+                    max={Number(data?.withdrawable || 0) / 1e6}
+                    step={0.001}
+                    valueLabelDisplay="auto"
+                    valueLabelFormat={(value) => `${value.toFixed(6)} VOI`}
+                    sx={{
+                      color: isDarkTheme ? "#FFFFFF" : undefined,
+                      "& .MuiSlider-valueLabel": {
+                        backgroundColor: isDarkTheme
+                          ? "rgba(30, 30, 30, 0.95)"
+                          : undefined,
+                      },
+                    }}
+                  />
+                  <Button
+                    onClick={() => 
+                      setWithdrawAmount(Number(data?.withdrawable || 0) / 1e6)
+                    }
+                    variant={isDarkTheme ? "outlined" : "contained"}
+                    size="small"
+                    sx={{
+                      color: isDarkTheme ? "#FFFFFF" : undefined,
+                      minWidth: "60px",
+                    }}
+                  >
+                    Max
+                  </Button>
+                </Box>
+              </>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          {!isWithdrawLoading && (
+            <>
+              <Button
+                onClick={() => setIsWithdrawModalOpen(false)}
+                variant={isDarkTheme ? "outlined" : "contained"}
+                sx={{
+                  color: isDarkTheme ? "#FFFFFF" : undefined,
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleClaim}
+                disabled={withdrawAmount <= 0}
+                variant={isDarkTheme ? "outlined" : "contained"}
+                sx={{
+                  color: isDarkTheme ? "#FFFFFF" : undefined,
+                }}
+              >
+                {isWithdrawLoading ? (
+                  <CircularProgress
+                    size={16}
+                    sx={{ color: isDarkTheme ? "#FFFFFF" : "inherit" }}
+                  />
+                ) : (
+                  "Confirm"
+                )}
+              </Button>
+            </>
+          )}
+        </DialogActions>
       </Dialog>
 
       <Dialog
@@ -1026,8 +1193,88 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
         fullWidth
         open={isBlockProductionModalOpen}
         onClose={() => setIsBlockProductionModalOpen(false)}
+        PaperProps={{
+          sx: {
+            backgroundColor: isDarkTheme ? "rgba(30, 30, 30, 0.95)" : "rgba(255, 255, 255, 0.95)",
+            backdropFilter: "blur(10px)",
+            borderRadius: "16px",
+          },
+        }}
       >
-        {/* ... same block production modal content ... */}
+        <DialogTitle>
+          <Typography variant="h6" color={isDarkTheme ? "#FFFFFF" : undefined}>
+            Block Production History
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          {isLoadingBlockData ? (
+            <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <>
+              <Box sx={{ mb: 4 }}>
+                <BlockProductionGraph
+                  data={transformDataForGraph(blockProductionData)}
+                  isDarkTheme={isDarkTheme}
+                />
+              </Box>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
+                      Period
+                    </TableCell>
+                    <TableCell align="right" sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
+                      Blocks Produced
+                    </TableCell>
+                    <TableCell align="right" sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
+                      Total Blocks
+                    </TableCell>
+                    <TableCell align="right" sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
+                      Participation Rate
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {blockProductionData.map((snapshot, index) => {
+                    const blocksProduced = snapshot.proposers[nft.staking.contractAddress] || 0;
+                    const participationRate = ((blocksProduced / snapshot.total_blocks) * 100).toFixed(2);
+
+                    return (
+                      <TableRow key={index}>
+                        <TableCell sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
+                          {moment(snapshot.start_date).format("MMM D")} -{" "}
+                          {moment(snapshot.end_date).format("MMM D, YYYY")}
+                        </TableCell>
+                        <TableCell align="right" sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
+                          {blocksProduced.toLocaleString()}
+                        </TableCell>
+                        <TableCell align="right" sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
+                          {snapshot.total_blocks.toLocaleString()}
+                        </TableCell>
+                        <TableCell align="right" sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
+                          {participationRate}%
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setIsBlockProductionModalOpen(false)}
+            variant={isDarkTheme ? "outlined" : "contained"}
+            sx={{
+              color: isDarkTheme ? "#FFFFFF" : undefined,
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
       </Dialog>
 
       <DelegateModal
