@@ -493,9 +493,7 @@ const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
                   </SortableHeader>
                 </TableCell>
                 <TableCell style={headCellStyle} align="right">
-                  <SortableHeader column="part_vote_lst">
-                    Proposer Blocks
-                  </SortableHeader>
+                  Proposer Blocks
                 </TableCell>
                 <TableCell style={headCellStyle} align="right">
                   <SortableHeader column="claimable">
@@ -529,7 +527,7 @@ const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
       </CustomTabPanel>
       <CustomTabPanel value={value} index={1}>
         <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
-          <Button
+          {/*<Button
             variant="contained"
             onClick={handleWithdrawAllClick}
             sx={{
@@ -539,6 +537,7 @@ const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
           >
             Withdraw All
           </Button>
+          */}
         </Box>
         <TableContainer component={Paper} style={tableStyle}>
           <Table>
@@ -567,7 +566,13 @@ const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
                   <SortableHeader column="expires">Expires</SortableHeader>
                 </TableCell>
                 <TableCell style={headCellStyle} align="right">
+                  Proposer Blocks
+                </TableCell>
+                <TableCell style={headCellStyle} align="right">
                   <SortableHeader column="claimable">Claimable</SortableHeader>
+                </TableCell>
+                <TableCell style={headCellStyle} align="right">
+                  Action
                 </TableCell>
               </TableRow>
             </TableHead>
