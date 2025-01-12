@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -9,6 +9,7 @@ import {
   useTheme,
   Link,
   Tooltip,
+  MenuItem,
 } from "@mui/material";
 import styled, { keyframes } from "styled-components";
 import { toast } from "react-toastify";
@@ -473,14 +474,88 @@ const notifications: Notification[] = [
   */
 ];
 
+// Add these near the top with other interfaces
+interface ContractOption {
+  id: number;
+  name: string;
+  description: string;
+}
+
+const CONTRACT_OPTIONS: ContractOption[] = [
+  {
+    id: 664258,
+    name: "CCV",
+    description: "Community Chest Voi",
+  },
+  {
+    id: 390001,
+    name: "wVOI",
+    description: "Wrapped VOI",
+  },
+  {
+    id: 770561,
+    name: "FV",
+    description: "Fountain VOI",
+  },
+  {
+    id: 828295,
+    name: "EV",
+    description: "En VOI",
+  },
+  {
+    id: 888305,
+    name: "WV",
+    description: "Womp VOI",
+  },
+];
+
+// Add this styled component with other styled components
+const ContractSelect = styled(TextField)<{ $isDarkTheme: boolean }>`
+  margin-bottom: 24px;
+
+  .MuiOutlinedInput-root {
+    color: ${(props) => (props.$isDarkTheme ? "#fff" : "#000")};
+    background-color: ${(props) =>
+      props.$isDarkTheme ? "rgba(0, 0, 0, 0.4)" : "rgba(255, 255, 255, 0.1)"};
+    border-radius: 8px;
+  }
+
+  .MuiOutlinedInput-notchedOutline {
+    border-color: ${(props) =>
+      props.$isDarkTheme ? "rgba(255, 255, 255, 0.2)" : "rgba(0, 0, 0, 0.2)"};
+  }
+
+  &:hover .MuiOutlinedInput-notchedOutline {
+    border-color: ${(props) =>
+      props.$isDarkTheme ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)"};
+  }
+
+  .MuiSelect-icon {
+    color: ${(props) =>
+      props.$isDarkTheme ? "rgba(255, 255, 255, 0.7)" : "rgba(0, 0, 0, 0.7)"};
+  }
+`;
+
+// Add this styled component with other styled components
+const CautionBox = styled(Box)<{ $isDarkTheme: boolean }>`
+  background-color: ${(props) =>
+    props.$isDarkTheme ? "rgba(255, 152, 0, 0.1)" : "rgba(255, 152, 0, 0.05)"};
+  border: 1px solid
+    ${(props) =>
+      props.$isDarkTheme ? "rgba(255, 152, 0, 0.3)" : "rgba(255, 152, 0, 0.2)"};
+  border-radius: 8px;
+  padding: 16px;
+  margin: 24px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+`;
+
 const CommunityChest: React.FC<CommunityChestProps> = ({
   isDarkTheme,
   connected,
   address,
 }) => {
-  //const ctcInfo = 390001; // wVOI
-  const ctcInfo = 664258; // CCV
-  //const ctcInfo = 828295; // EV
   const { signTransactions } = useWallet();
   const [totalInChest, setTotalInChest] = useState<string>("0");
   const [holders, setHolders] = useState<number>(0);
@@ -500,33 +575,35 @@ const CommunityChest: React.FC<CommunityChestProps> = ({
   const [showRewardDistribution, setShowRewardDistribution] = useState(false);
   const [timeUntilNextEpoch, setTimeUntilNextEpoch] = useState<string>("");
   const { name: resolvedName } = useEnvoiResolver(address);
+  const [selectedContract, setSelectedContract] = useState<number>(664258);
 
   useEffect(() => {
     if (connected) {
       fetchData();
     }
-  }, [connected, address]);
+  }, [connected, address, selectedContract]);
 
   // Update the fetchData function
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
       const { algodClient } = getAlgorandClients();
 
       // Fetch contract data
 
-      const ctcAddr = algosdk.getApplicationAddress(ctcInfo);
+      const ctcAddr = algosdk.getApplicationAddress(selectedContract);
       const accInfo = await algodClient.accountInformation(ctcAddr).do();
       const { amount } = accInfo;
 
       // Fetch holders data
       const response = await axios.get(
-        `https://mainnet-idx.nautilus.sh/nft-indexer/v1/arc200/balances?contractId=664258`
+        `https://mainnet-idx.nautilus.sh/nft-indexer/v1/arc200/balances?contractId=${selectedContract}`
       );
       const filteredHolders =
         response?.data?.balances?.filter(
           (balance: any) =>
-            balance.accountId !== algosdk.getApplicationAddress(664258) &&
+            balance.accountId !==
+              algosdk.getApplicationAddress(selectedContract) &&
             balance.balance !== "0"
         ) || [];
       setHoldersList(filteredHolders);
@@ -535,7 +612,7 @@ const CommunityChest: React.FC<CommunityChestProps> = ({
       // Fetch epoch summary
       const epochResponse = await axios.get<ApiResponse>(
         `https://api.voirewards.com/proposers/index_main_3.php?action=epoch-summary&wallet=${algosdk.getApplicationAddress(
-          ctcInfo
+          selectedContract
         )}`
       );
 
@@ -549,7 +626,7 @@ const CommunityChest: React.FC<CommunityChestProps> = ({
       console.log("Latest Epoch:", sortedEpochs[0]);
 
       // Get user balance
-      const ci = new CONTRACT(ctcInfo, algodClient, null, abi.nt200, {
+      const ci = new CONTRACT(selectedContract, algodClient, null, abi.nt200, {
         addr:
           address ||
           "G3MSA75OZEJTCCENOJDLDJK7UD7E2K5DNC7FVHCNOV7E3I4DTXTOWDUIFQ",
@@ -579,7 +656,7 @@ const CommunityChest: React.FC<CommunityChestProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedContract]);
 
   const handleDeposit = async () => {
     if (!connected) {
@@ -591,14 +668,20 @@ const CommunityChest: React.FC<CommunityChestProps> = ({
       setIsLoading(true);
 
       const { algodClient } = getAlgorandClients();
-      const ciC = new CONTRACT(ctcInfo, algodClient, null, abi.custom, {
-        addr:
-          address ||
-          "G3MSA75OZEJTCCENOJDLDJK7UD7E2K5DNC7FVHCNOV7E3I4DTXTOWDUIFQ",
-        sk: Uint8Array.from([]),
-      });
+      const ciC = new CONTRACT(
+        selectedContract,
+        algodClient,
+        null,
+        abi.custom,
+        {
+          addr:
+            address ||
+            "G3MSA75OZEJTCCENOJDLDJK7UD7E2K5DNC7FVHCNOV7E3I4DTXTOWDUIFQ",
+          sk: Uint8Array.from([]),
+        }
+      );
       const ci = new CONTRACT(
-        ctcInfo,
+        selectedContract,
         algodClient,
         null,
         abi.nt200,
@@ -680,7 +763,7 @@ const CommunityChest: React.FC<CommunityChestProps> = ({
     try {
       setIsLoading(true);
       const { algodClient } = getAlgorandClients();
-      const ci = new CONTRACT(ctcInfo, algodClient, null, abi.nt200, {
+      const ci = new CONTRACT(selectedContract, algodClient, null, abi.nt200, {
         addr:
           address ||
           "G3MSA75OZEJTCCENOJDLDJK7UD7E2K5DNC7FVHCNOV7E3I4DTXTOWDUIFQ",
@@ -811,6 +894,55 @@ const CommunityChest: React.FC<CommunityChestProps> = ({
 
   return (
     <Layout>
+      <ContractSelect
+        sx={{
+          mt: 3,
+        }}
+        select
+        label="Select Contract"
+        value={selectedContract}
+        onChange={(e) => {
+          setSelectedContract(Number(e.target.value));
+        }}
+        $isDarkTheme={isDarkTheme}
+        fullWidth
+        SelectProps={{
+          MenuProps: {
+            PaperProps: {
+              sx: {
+                bgcolor: isDarkTheme ? "#1a1a1a" : "#fff",
+                color: isDarkTheme ? "#fff" : "#000",
+                "& .MuiMenuItem-root": {
+                  "&:hover": {
+                    bgcolor: isDarkTheme
+                      ? "rgba(255, 255, 255, 0.1)"
+                      : "rgba(0, 0, 0, 0.1)",
+                  },
+                },
+              },
+            },
+          },
+        }}
+      >
+        {CONTRACT_OPTIONS.map((option) => (
+          <MenuItem key={option.id} value={option.id}>
+            <Box>
+              <Typography variant="body1">{option.name}</Typography>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: isDarkTheme
+                    ? "rgba(255, 255, 255, 0.7)"
+                    : "rgba(0, 0, 0, 0.7)",
+                }}
+              >
+                {option.description}
+              </Typography>
+            </Box>
+          </MenuItem>
+        ))}
+      </ContractSelect>
+
       <Container $isDarkTheme={isDarkTheme}>
         <HeaderContainer>
           <ChestIcon
@@ -893,6 +1025,54 @@ const CommunityChest: React.FC<CommunityChestProps> = ({
             </NotificationItem>
           ))}
         </NotificationSection>
+
+        {selectedContract !== 664258 && (
+          <>
+            <CautionBox $isDarkTheme={isDarkTheme}>
+              <InfoIcon sx={{ color: "warning.main" }} />
+              <Typography
+                variant="body2"
+                sx={{ color: isDarkTheme ? "warning.light" : "warning.dark" }}
+              >
+                You are currently viewing{" "}
+                {
+                  CONTRACT_OPTIONS.find((opt) => opt.id === selectedContract)
+                    ?.name
+                }{" "}
+                statistics. Only CCV (Community Chest Voi) holders are eligible
+                for weekly rewards and participation in the Community Chest.
+              </Typography>
+            </CautionBox>
+
+            <Typography
+              variant="body2"
+              sx={{
+                mt: 2,
+                mb: 3,
+                px: 2,
+                color: isDarkTheme
+                  ? "rgba(255, 255, 255, 0.7)"
+                  : "rgba(0, 0, 0, 0.7)",
+                fontStyle: "italic",
+              }}
+            >
+              {(() => {
+                switch (selectedContract) {
+                  case 390001:
+                    return "Wrapped VOI (wVOI) is a wrapped version of the native VOI token, enabling easier integration with DeFi protocols and smart contracts while maintaining 1:1 parity with VOI. There are no incentives to hold wVOI. However, community members may support the project by holding wVOI.";
+                  case 770561:
+                    return "Fountain VOI (FV) is a wrapped VOI token that represents staked VOI in the Voi Fountain, allowing users to support the project by holding Fountain VOI and earn extra rewards provided by the Fountain.";
+                  case 828295:
+                    return "En VOI (EV) is a wrapped VOI token that represents staked VOI in the enVoi Naming Service. Name registrations and renewals are held in En VOI. There are no incentives to hold En VOI. However, community members may support the project by holding En VOI.";
+                  case 888305:
+                    return "Womp VOI (WV) is a wrapped VOI token that represents staked VOI in WompCrew. There are no incentives to hold WV. However, community members may support the project by holding WV.";
+                  default:
+                    return "";
+                }
+              })()}
+            </Typography>
+          </>
+        )}
 
         <StatsCard
           style={{
