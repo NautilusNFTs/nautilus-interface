@@ -30,7 +30,7 @@ import BlockProductionGraph from "./components/BlockProductionGraph";
 import InfoIcon from "@mui/icons-material/Info";
 import RewardDistributionModal from "./components/RewardDistributionModal";
 import LEDCountdown from "./components/LEDCountdown";
-import { useEnvoiResolver } from '@/hooks/useEnvoiResolver';
+import { useEnvoiResolver } from "@/hooks/useEnvoiResolver";
 
 const findCommonRatio = (a: number, totalSum: number, n: number) => {
   // Using numerical method (binary search) to find r
@@ -1271,7 +1271,7 @@ const CommunityChest: React.FC<CommunityChestProps> = ({
             style={{ marginBottom: "24px" }}
           >
             <Label $isDarkTheme={isDarkTheme}>
-              {resolvedName ? resolvedName : 'Your'} Balance
+              {resolvedName ? resolvedName : "Your"} Balance
             </Label>
             {isLoading ? (
               <CircularProgress size={24} />

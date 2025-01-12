@@ -81,9 +81,15 @@ export const useStakingContract = (
         return {
           ...account,
           withdrawable: withdrawable.toString(),
+          unlockTime:
+            account.global_funding +
+            (account.global_lockup_delay +
+              account.global_vesting_delay * account.global_period) *
+              account.global_period_seconds +
+            account.global_distribution_count *
+              account.global_distribution_seconds,
         };
       }
-
       return account;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes

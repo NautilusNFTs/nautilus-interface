@@ -72,6 +72,9 @@ type SortColumn =
   | "unlock"
   | "claimable"
   | "expires"
+  | "global_delegate"
+  | "part_vote_lst"
+  | "unlockTime"
   | null;
 
 const StyledTabs = styled(Tabs)<{ $isDarkTheme: boolean }>`
@@ -445,7 +448,7 @@ const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
       </StyledTabs>
       <CustomTabPanel value={value} index={0}>
         <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
-          <Button
+          {/*<Button
             variant="contained"
             onClick={handleWithdrawAllClick}
             sx={{
@@ -455,6 +458,7 @@ const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
           >
             Withdraw All
           </Button>
+          */}
         </Box>
         <TableContainer component={Paper} style={tableStyle}>
           <Table>
@@ -469,7 +473,9 @@ const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
                   Account Address
                 </TableCell>
                 <TableCell style={headCellStyle} align="center">
-                  Delegate
+                  <SortableHeader column="global_delegate">
+                    Delegate
+                  </SortableHeader>
                 </TableCell>
                 <TableCell style={headCellStyle} align="right">
                   <SortableHeader column="totalStaked">
@@ -477,13 +483,27 @@ const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
                   </SortableHeader>
                 </TableCell>
                 <TableCell style={headCellStyle} align="right">
-                  <SortableHeader column="unlock">Unlock Time</SortableHeader>
+                  <SortableHeader column="unlockTime">
+                    Unlock Time
+                  </SortableHeader>
                 </TableCell>
                 <TableCell style={headCellStyle} align="right">
-                  <SortableHeader column="expires">Expires</SortableHeader>
+                  <SortableHeader column="part_vote_lst">
+                    Expires
+                  </SortableHeader>
                 </TableCell>
                 <TableCell style={headCellStyle} align="right">
-                  <SortableHeader column="claimable">Claimable</SortableHeader>
+                  <SortableHeader column="part_vote_lst">
+                    Proposer Blocks
+                  </SortableHeader>
+                </TableCell>
+                <TableCell style={headCellStyle} align="right">
+                  <SortableHeader column="claimable">
+                    Claimable Amount
+                  </SortableHeader>
+                </TableCell>
+                <TableCell style={headCellStyle} align="right">
+                  Action
                 </TableCell>
               </TableRow>
             </TableHead>

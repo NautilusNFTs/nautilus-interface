@@ -14,6 +14,13 @@ import {
   TextField,
   Grid,
   Box,
+  CircularProgress,
+  Menu,
+  MenuItem,
+  Slider,
+  Table,
+  TableHead,
+  TableBody,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import moment from "moment";
@@ -24,26 +31,51 @@ import { toast } from "react-toastify";
 import VIAIcon from "/src/static/crypto-icons/voi/6779767.svg";
 import { getStakingTotalTokens, getStakingUnlockTime } from "@/utils/staking";
 import { useStakingContract } from "@/hooks/staking";
-import { waitForConfirmation } from "algosdk";
+import algosdk, { waitForConfirmation } from "algosdk";
 import party from "party-js";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import DelegateModal from "@/components/modals/DelegateModal";
 import humanizeDuration from "humanize-duration";
+import {
+  MoreVerticalIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
+  UserIcon,
+  PowerIcon,
+  BarChart3Icon,
+} from "lucide-react";
+import BlockProductionGraph from "@/pages/CommunityChest/components/BlockProductionGraph";
+import { useBlocks } from "@/hooks/useBlocks";
+
+// format number using Intl.NumberFormat
+// 100.12342 -> 100
+// 1000 -> 1K
+// 1000000 -> 1M
+// 1000000000 -> 1B
+// 1000000000000 -> 1T
+// 1000000000000000 -> 1Q
+// 1000000000000000000 -> 1Q
+const formatNumber = (number: number) => {
+  if (number < 1000) {
+    return number.toFixed(0);
+  }
+  if (number < 1000000) {
+    return `${(number / 1000).toFixed(0)}K`;
+  }
+  if (number < 1000000000) {
+    return `${(number / 1000000).toFixed(0)}M`;
+  }
+  if (number < 1000000000000) {
+    return `${(number / 1000000000).toFixed(0)}B`;
+  }
+  if (number < 1000000000000000) {
+    return `${(number / 1000000000000).toFixed(0)}T`;
+  }
+  return `${(number / 1000000000000000).toFixed(0)}Q`;
+};
 
 const { algodClient } = getAlgorandClients();
-
-interface PositionRowProps {
-  position: {
-    contractId: string;
-    tokenId: string;
-    contractAddress: string;
-    withdrawable: string;
-    global_delegate: string;
-    part_vote_lst: number;
-  };
-  cellStyle: React.CSSProperties;
-}
 
 const ParticipateModal: React.FC<{
   open: boolean;
@@ -283,9 +315,43 @@ const ParticipateModal: React.FC<{
   );
 };
 
+interface PositionRowProps {
+  position: {
+    contractId: string;
+    tokenId: string;
+    contractAddress: string;
+    withdrawable: string;
+    global_delegate: string;
+    part_vote_lst: number;
+  };
+  cellStyle: React.CSSProperties;
+}
+
+// Add new interface for block production data
+interface BlockProductionData {
+  start_date: string;
+  end_date: string;
+  proposers: Record<string, number>;
+  total_blocks: number;
+  ballast_blocks: number;
+}
+
 const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
+  const {
+    data: blocksData,
+    isLoading: isLoadingBlocks,
+    refetch: refetchBlocks,
+  } = useBlocks();
+
   const { isDarkTheme } = useSelector((state: RootState) => state.theme);
   const { activeAccount, signTransactions } = useWallet();
+
+  const [isDepositLoading, setIsDepositLoading] = useState(false);
+  const [amount, setAmount] = useState<string>("");
+  const [isWithdrawLoading, setIsWithdrawLoading] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState<number>(0);
+  const [maxAmount, setMaxAmount] = useState<number>(0);
+
   const { data, isLoading, refetch } = useStakingContract(
     Number(position.contractId),
     {
@@ -301,6 +367,7 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
   };
   const handleClaim = async () => {
     if (!activeAccount) return;
+    setIsWithdrawLoading(true);
     const apid = Number(position.contractId);
     const ci = new CONTRACT(
       apid,
@@ -323,7 +390,7 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
     );
     ci.setFee(5000);
     try {
-      const withdrawR2 = await ci.withdraw(BigInt(data?.withdrawable || 0));
+      const withdrawR2 = await ci.withdraw(BigInt(withdrawAmount));
       if (!withdrawR2.success) {
         console.log({ withdrawR2 });
         throw new Error("Withdraw failed in simulate");
@@ -346,6 +413,8 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
     } catch (error) {
       console.error("Error claiming rewards:", error);
       toast.error("Failed to claim rewards");
+    } finally {
+      setIsWithdrawLoading(false);
     }
   };
 
@@ -387,129 +456,169 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
     });
   };
 
-  const renderExpirationCell = () => {
-    if (!position.part_vote_lst) {
-      return (
-        <>
-          <Button
-            variant={isDarkTheme ? "outlined" : "contained"}
-            size="small"
-            onClick={() => setIsParticipateModalOpen(true)}
-            sx={{
-              borderRadius: "12px",
-              fontSize: "0.75rem",
-              color: isDarkTheme ? "#FFFFFF" : undefined,
-              backgroundColor: isDarkTheme ? "transparent" : undefined,
-              borderColor: isDarkTheme ? "rgba(255, 255, 255, 0.3)" : undefined,
-              "&:hover": {
-                backgroundColor: isDarkTheme
-                  ? "rgba(255, 255, 255, 0.1)"
-                  : undefined,
-                borderColor: isDarkTheme
-                  ? "rgba(255, 255, 255, 0.5)"
-                  : undefined,
-              },
-            }}
-          >
-            Go Online
-          </Button>
-        </>
-      );
-    }
+  const [isParticipateModalOpen, setIsParticipateModalOpen] = useState(false);
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
 
-    const roundDifference = position.part_vote_lst - currentRound;
-    const isExpired = roundDifference <= 0;
-    const timeRemaining = getExpirationTime(position.part_vote_lst);
+  // Add new state for dropdown menu
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
 
-    // Calculate if expiration is within 7 days
-    const secondsRemaining = roundDifference * 2.8;
-    const sevenDaysInSeconds = 7 * 24 * 60 * 60;
-    const isNearExpiration = secondsRemaining <= sevenDaysInSeconds;
-
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 1,
-          justifyContent: "flex-end",
-        }}
-      >
-        {timeRemaining === null ? (
-          <Skeleton width={80} />
-        ) : (
-          <Typography
-            sx={{
-              color: isExpired
-                ? "error.main"
-                : isNearExpiration
-                ? "warning.main"
-                : "inherit",
-            }}
-          >
-            {timeRemaining}
-          </Typography>
-        )}
-        {!isExpired && !isNearExpiration && (
-          <Button
-            variant={isDarkTheme ? "outlined" : "contained"}
-            size="small"
-            onClick={() => setIsParticipateModalOpen(true)}
-            sx={{
-              borderRadius: "12px",
-              fontSize: "0.75rem",
-              minWidth: "60px",
-              color: isDarkTheme ? "#FFFFFF" : undefined,
-              backgroundColor: isDarkTheme ? "transparent" : undefined,
-              borderColor: isDarkTheme ? "rgba(255, 255, 255, 0.3)" : undefined,
-              "&:hover": {
-                backgroundColor: isDarkTheme
-                  ? "rgba(255, 255, 255, 0.1)"
-                  : undefined,
-                borderColor: isDarkTheme
-                  ? "rgba(255, 255, 255, 0.5)"
-                  : undefined,
-              },
-            }}
-          >
-            Update
-          </Button>
-        )}
-        {!isExpired && isNearExpiration && (
-          <Button
-            variant={isDarkTheme ? "outlined" : "contained"}
-            size="small"
-            onClick={() => setIsParticipateModalOpen(true)}
-            sx={{
-              borderRadius: "12px",
-              fontSize: "0.75rem",
-              minWidth: "60px",
-              color: isDarkTheme ? "#FFFFFF" : undefined,
-              backgroundColor: isDarkTheme ? "transparent" : undefined,
-              borderColor: isDarkTheme ? "rgba(255, 255, 255, 0.3)" : undefined,
-              "&:hover": {
-                backgroundColor: isDarkTheme
-                  ? "rgba(255, 255, 255, 0.1)"
-                  : undefined,
-                borderColor: isDarkTheme
-                  ? "rgba(255, 255, 255, 0.5)"
-                  : undefined,
-              },
-            }}
-          >
-            Renew
-          </Button>
-        )}
-        <ParticipateModal
-          open={isParticipateModalOpen}
-          onClose={() => setIsParticipateModalOpen(false)}
-          contractId={position.contractId}
-        />
-      </Box>
-    );
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setAnchorEl(event.currentTarget);
   };
 
-  const [isParticipateModalOpen, setIsParticipateModalOpen] = useState(false);
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleWithdrawConfirm = async () => {
+    if (!activeAccount) return;
+    setIsWithdrawLoading(true);
+    const apid = Number(position.contractId);
+    const ci = new CONTRACT(
+      apid,
+      algodClient,
+      undefined,
+      {
+        name: "NautilusVoiStaking",
+        methods: [
+          {
+            name: "withdraw",
+            args: [{ type: "uint64", name: "amount" }],
+            readonly: false,
+            returns: { type: "uint64" },
+            desc: "Withdraw funds from contract.",
+          },
+        ],
+        events: [],
+      },
+      { addr: activeAccount.address, sk: new Uint8Array(0) }
+    );
+    ci.setFee(5000);
+    try {
+      const withdrawR2 = await ci.withdraw(BigInt(withdrawAmount));
+      if (!withdrawR2.success) {
+        console.log({ withdrawR2 });
+        throw new Error("Withdraw failed in simulate");
+      }
+      const stxns = await signTransactions(
+        withdrawR2.txns.map(
+          (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
+        )
+      );
+      const { txId } = await algodClient
+        .sendRawTransaction(stxns as Uint8Array[])
+        .do();
+      await waitForConfirmation(algodClient, txId, 4);
+      await refetch();
+      party.confetti(document.body, {
+        count: party.variation.range(200, 300),
+        size: party.variation.range(1, 1.4),
+      });
+      toast.success("Claimed");
+      setIsWithdrawModalOpen(false);
+      setWithdrawAmount(0);
+    } catch (error) {
+      console.error("Error claiming rewards:", error);
+      toast.error("Failed to claim rewards");
+    } finally {
+      setIsWithdrawLoading(false);
+    }
+  };
+
+  const handleDepositConfirm = async () => {
+    if (!activeAccount || !amount) {
+      toast.error("Please connect your wallet and enter an amount");
+      return;
+    }
+
+    setIsDepositLoading(true);
+    try {
+      // Create payment transaction to app account
+      const suggestedParams = await algodClient.getTransactionParams().do();
+      const paymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+        from: activeAccount.address,
+        to: position.contractAddress,
+        amount: Math.floor(Number(amount) * 1e6), // Convert VOI to microVOI
+        suggestedParams,
+        note: new TextEncoder().encode(
+          `deposit ${amount} VOI to staking contract ${position.contractId}`
+        ),
+      });
+      const stxns = await signTransactions([paymentTxn.toByte()]);
+      const { txId } = await algodClient
+        .sendRawTransaction(stxns as Uint8Array[])
+        .do();
+
+      await waitForConfirmation(algodClient, txId, 4);
+      await refetch();
+      toast.success("Successfully deposited funds");
+      setIsDepositModalOpen(false);
+      setAmount("");
+    } catch (error) {
+      console.error("Error depositing:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to deposit funds"
+      );
+    } finally {
+      setIsDepositLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (activeAccount?.address && isDepositModalOpen) {
+        try {
+          const accountInfo = await algodClient
+            .accountInformation(activeAccount.address)
+            .do();
+          const amount = accountInfo.amount;
+          const minBalance = accountInfo["min-balance"];
+          const availableBalance = Math.max(amount - minBalance - 1e6, 0) / 1e6;
+          setMaxAmount(availableBalance);
+        } catch (error) {
+          console.error("Error fetching balance:", error);
+          setMaxAmount(0);
+        }
+      }
+    };
+
+    fetchBalance();
+  }, [activeAccount?.address, isDepositModalOpen]);
+
+  // Add new state and modal component
+  const [isBlockProductionModalOpen, setIsBlockProductionModalOpen] =
+    useState(false);
+  const [blockProductionData, setBlockProductionData] = useState<
+    BlockProductionData[]
+  >([]);
+  const [isLoadingBlockData, setIsLoadingBlockData] = useState(false);
+
+  // Add new function to fetch block production data
+  const fetchBlockProductionData = async (contractAddress: string) => {
+    setIsLoadingBlockData(true);
+    try {
+      const response = await fetch(
+        `https://api.voirewards.com/proposers/index_main_3.php?action=epoch-summary&wallet=${contractAddress}`
+      );
+      const data = await response.json();
+      setBlockProductionData(data.snapshots || []);
+    } catch (error) {
+      console.error("Error fetching block production data:", error);
+      toast.error("Failed to fetch block production data");
+    } finally {
+      setIsLoadingBlockData(false);
+    }
+  };
+
+  // Inside PositionRow component, update this function to use period numbers
+  const transformDataForGraph = (data: BlockProductionData[]) => {
+    return data.map((snapshot, index) => ({
+      count: snapshot.proposers[position.contractAddress] || 0,
+      label: `${index}`, // Most recent period will be Period 1
+    }));
+  };
 
   if (isLoading) {
     return (
@@ -563,8 +672,8 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
             rel="noopener noreferrer"
             style={{ color: "inherit" }}
           >
-            {position.contractAddress.slice(0, 10)}...
-            {position.contractAddress.slice(-10)}
+            {position.contractAddress.slice(0, 6)}...
+            {position.contractAddress.slice(-6)}
           </a>
           <ContentCopyIcon
             style={{
@@ -588,8 +697,8 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
           align="center"
           onClick={() => setIsDelegateModalOpen(true)}
         >
-          {position.global_delegate.slice(0, 10)}...
-          {position.global_delegate.slice(-10)}
+          {position.global_delegate.slice(0, 6)}...
+          {position.global_delegate.slice(-6)}
           <ContentCopyIcon
             style={{
               cursor: "pointer",
@@ -611,7 +720,28 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
           }}
           align="right"
         >
-          {getStakingTotalTokens(position)} VOI
+          <Box sx={{ display: "flex", alignItems: "center" }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-evenly",
+                flexShrink: 0,
+              }}
+            >
+              <img src={VIAIcon} style={{ height: "12px" }} alt="VOI Icon" />
+              <Typography
+                variant="body2"
+                sx={{
+                  ml: 1,
+                  color: isDarkTheme ? "white" : "black",
+                  fontWeight: 500,
+                }}
+              >
+                {formatNumber(getStakingTotalTokens(position))} VOI
+              </Typography>
+            </Box>
+          </Box>
         </TableCell>
         <TableCell
           style={{
@@ -621,7 +751,9 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
           }}
           align="right"
         >
-          {moment.unix(getStakingUnlockTime(position)).fromNow(true)}
+          <Typography variant="body2" sx={{ flexShrink: 0 }}>
+            {moment.unix(getStakingUnlockTime(position)).fromNow(true)}
+          </Typography>
         </TableCell>
         <TableCell
           style={{
@@ -631,7 +763,69 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
           }}
           align="right"
         >
-          {renderExpirationCell()}
+          <Typography variant="body2" sx={{ flexShrink: 0 }}>
+            {getExpirationTime(position.part_vote_lst)}
+          </Typography>
+        </TableCell>
+        <TableCell
+          style={{
+            ...cellStyleWithColor,
+            color: isDarkTheme ? "white" : "black",
+            fontWeight: 100,
+          }}
+          align="right"
+        >
+          {blocksData?.getProposerBlocks(position.contractAddress)}
+        </TableCell>
+        <TableCell
+          style={{
+            ...cellStyleWithColor,
+            color: isDarkTheme ? "white" : "black",
+            fontWeight: 100,
+          }}
+          align="right"
+        >
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              animation:
+                Number(data?.withdrawable || 0) > 0
+                  ? "glow 1.5s ease-in-out infinite alternate"
+                  : "none",
+              "@keyframes glow": {
+                from: {
+                  textShadow: "0 0 5px rgba(255,255,255,0.2)",
+                },
+                to: {
+                  textShadow: "0 0 20px rgba(255,255,255,0.6)",
+                },
+              },
+            }}
+          >
+            <img
+              src={VIAIcon}
+              style={{
+                height: "12px",
+                filter:
+                  Number(data?.withdrawable || 0) === 0
+                    ? "grayscale(100%)"
+                    : undefined,
+              }}
+              alt="VOI Icon"
+            />
+            <Typography
+              variant="body2"
+              sx={{
+                ml: 1,
+                color: isDarkTheme ? "white" : "black",
+                fontWeight: 500,
+              }}
+            >
+              {Number(data?.withdrawable || 0) / 1e6} VOI
+            </Typography>
+          </Box>
         </TableCell>
         <TableCell
           style={{
@@ -642,29 +836,341 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
           align="right"
         >
           <Button
-            sx={{
-              borderRadius: "20px",
-              color: "inherit",
-            }}
-            onClick={handleClaim}
-            disabled={data?.withdrawable === "0"}
+            id="actions-button"
+            aria-controls={open ? "actions-menu" : undefined}
+            aria-haspopup="true"
+            aria-expanded={open ? "true" : undefined}
+            onClick={handleClick}
             variant={isDarkTheme ? "outlined" : "contained"}
             size="small"
+            sx={{
+              borderRadius: "12px",
+              minWidth: "40px",
+              color: isDarkTheme ? "#FFFFFF" : undefined,
+              backgroundColor: isDarkTheme ? "transparent" : undefined,
+              borderColor: isDarkTheme ? "rgba(255, 255, 255, 0.3)" : undefined,
+            }}
           >
-            <img src={VIAIcon} style={{ height: "12px" }} alt="VOI Icon" />
-            <Typography
-              variant="body2"
+            <MoreVerticalIcon />
+          </Button>
+          <Menu
+            id="actions-menu"
+            anchorEl={anchorEl}
+            open={open}
+            onClose={handleClose}
+            MenuListProps={{
+              "aria-labelledby": "actions-button",
+            }}
+            PaperProps={{
+              sx: {
+                backgroundColor: isDarkTheme
+                  ? "rgba(30, 30, 30, 0.95)"
+                  : "rgba(255, 255, 255, 0.95)",
+                backdropFilter: "blur(10px)",
+              },
+            }}
+          >
+            <MenuItem
+              onClick={() => {
+                setIsDepositModalOpen(true);
+                handleClose();
+              }}
               sx={{
-                ml: 1,
-                color: "white",
-                fontWeight: 500,
+                color: isDarkTheme ? "#FFFFFF" : undefined,
+                gap: 1.5,
               }}
             >
-              {Number(data?.withdrawable || 0) / 1e6} VOI
-            </Typography>
-          </Button>
+              <ArrowUpIcon size={18} /> Deposit
+            </MenuItem>
+            {Number(data?.withdrawable || 0) > 0 && (
+              <MenuItem
+                onClick={() => {
+                  setIsWithdrawModalOpen(true);
+                  handleClose();
+                }}
+                sx={{
+                  color: isDarkTheme ? "#FFFFFF" : undefined,
+                  gap: 1.5,
+                }}
+              >
+                <ArrowDownIcon size={18} /> Withdraw
+              </MenuItem>
+            )}
+            <MenuItem
+              onClick={() => {
+                setIsDelegateModalOpen(true);
+                handleClose();
+              }}
+              sx={{
+                color: isDarkTheme ? "#FFFFFF" : undefined,
+                gap: 1.5,
+              }}
+            >
+              <UserIcon size={18} /> Change Delegate
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                setIsParticipateModalOpen(true);
+                handleClose();
+              }}
+              sx={{
+                color: isDarkTheme ? "#FFFFFF" : undefined,
+                gap: 1.5,
+              }}
+            >
+              <PowerIcon size={18} />{" "}
+              {!position.part_vote_lst ? "Go Online" : "Update Participation"}
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                fetchBlockProductionData(position.contractAddress);
+                setIsBlockProductionModalOpen(true);
+                handleClose();
+              }}
+              sx={{
+                color: isDarkTheme ? "#FFFFFF" : undefined,
+                gap: 1.5,
+              }}
+            >
+              <BarChart3Icon size={18} /> View Block Production
+            </MenuItem>
+          </Menu>
         </TableCell>
       </TableRow>
+
+      <Dialog
+        maxWidth="xs"
+        fullWidth
+        open={isDepositModalOpen}
+        onClose={() => setIsDepositModalOpen(false)}
+        PaperProps={{
+          sx: {
+            backgroundColor: isDarkTheme
+              ? "rgba(30, 30, 30, 0.95)"
+              : "rgba(255, 255, 255, 0.95)",
+            backdropFilter: "blur(10px)",
+            borderRadius: "16px",
+          },
+        }}
+      >
+        <DialogTitle>
+          <Typography variant="h6" color={isDarkTheme ? "#FFFFFF" : undefined}>
+            Deposit VOI
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, py: 2 }}>
+            {isDepositLoading ? (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <CircularProgress
+                  size={100}
+                  sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                />
+                <Typography
+                  variant="h6"
+                  color={isDarkTheme ? "#FFFFFF" : undefined}
+                >
+                  Signature pending...
+                </Typography>
+              </Box>
+            ) : (
+              <>
+                <Typography color={isDarkTheme ? "#FFFFFF" : undefined}>
+                  Select amount to deposit: {Number(amount || 0).toFixed(6)} VOI
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <Slider
+                    value={Number(amount || 0)}
+                    onChange={(_, value) => setAmount(value.toString())}
+                    min={0}
+                    max={maxAmount}
+                    step={0.001}
+                    valueLabelDisplay="auto"
+                    valueLabelFormat={(value) => `${value.toFixed(6)} VOI`}
+                    sx={{
+                      color: isDarkTheme ? "#FFFFFF" : undefined,
+                      "& .MuiSlider-valueLabel": {
+                        backgroundColor: isDarkTheme
+                          ? "rgba(30, 30, 30, 0.95)"
+                          : undefined,
+                      },
+                    }}
+                  />
+                  <Button
+                    onClick={() => setAmount(maxAmount.toString())}
+                    variant={isDarkTheme ? "outlined" : "contained"}
+                    size="small"
+                    sx={{
+                      color: isDarkTheme ? "#FFFFFF" : undefined,
+                      minWidth: "60px",
+                    }}
+                  >
+                    Max
+                  </Button>
+                </Box>
+              </>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          {!isDepositLoading && (
+            <>
+              <Button
+                onClick={() => setIsDepositModalOpen(false)}
+                variant={isDarkTheme ? "outlined" : "contained"}
+                sx={{
+                  color: isDarkTheme ? "#FFFFFF" : undefined,
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={isDepositLoading}
+                onClick={handleDepositConfirm}
+                variant={isDarkTheme ? "outlined" : "contained"}
+                sx={{
+                  color: isDarkTheme ? "#FFFFFF" : undefined,
+                }}
+              >
+                {isDepositLoading ? (
+                  <CircularProgress
+                    size={16}
+                    sx={{ color: isDarkTheme ? "#FFFFFF" : "inherit" }}
+                  />
+                ) : (
+                  "Confirm"
+                )}
+              </Button>
+            </>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        maxWidth="xs"
+        fullWidth
+        open={isWithdrawModalOpen}
+        onClose={() => setIsWithdrawModalOpen(false)}
+        PaperProps={{
+          sx: {
+            backgroundColor: isDarkTheme
+              ? "rgba(30, 30, 30, 0.95)"
+              : "rgba(255, 255, 255, 0.95)",
+            backdropFilter: "blur(10px)",
+            borderRadius: "16px",
+          },
+        }}
+      >
+        <DialogTitle>
+          <Typography variant="h6" color={isDarkTheme ? "#FFFFFF" : undefined}>
+            Withdraw Funds
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, py: 2 }}>
+            {isWithdrawLoading ? (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <CircularProgress
+                  size={100}
+                  sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                />
+                <Typography
+                  variant="h6"
+                  color={isDarkTheme ? "#FFFFFF" : undefined}
+                >
+                  Signature pending...
+                </Typography>
+              </Box>
+            ) : (
+              <>
+                <Typography color={isDarkTheme ? "#FFFFFF" : undefined}>
+                  Select amount to withdraw: {withdrawAmount / 1e6} VOI
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <Slider
+                    value={withdrawAmount}
+                    onChange={(_, value) => setWithdrawAmount(value as number)}
+                    min={0}
+                    max={Number(data?.withdrawable || 0)}
+                    step={1000}
+                    valueLabelDisplay="auto"
+                    valueLabelFormat={(value) =>
+                      `${(value / 1e6).toFixed(6)} VOI`
+                    }
+                    sx={{
+                      color: isDarkTheme ? "#FFFFFF" : undefined,
+                      "& .MuiSlider-valueLabel": {
+                        backgroundColor: isDarkTheme
+                          ? "rgba(30, 30, 30, 0.95)"
+                          : undefined,
+                      },
+                    }}
+                  />
+                  <Button
+                    onClick={() =>
+                      setWithdrawAmount(Number(data?.withdrawable || 0))
+                    }
+                    variant={isDarkTheme ? "outlined" : "contained"}
+                    size="small"
+                    sx={{
+                      color: isDarkTheme ? "#FFFFFF" : undefined,
+                      minWidth: "60px",
+                    }}
+                  >
+                    Max
+                  </Button>
+                </Box>
+              </>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          {!isWithdrawLoading && (
+            <>
+              <Button
+                onClick={() => setIsWithdrawModalOpen(false)}
+                variant={isDarkTheme ? "outlined" : "contained"}
+                sx={{
+                  color: isDarkTheme ? "#FFFFFF" : undefined,
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={isWithdrawLoading}
+                onClick={handleWithdrawConfirm}
+                variant={isDarkTheme ? "outlined" : "contained"}
+                sx={{
+                  color: isDarkTheme ? "#FFFFFF" : undefined,
+                }}
+              >
+                {isWithdrawLoading ? (
+                  <CircularProgress
+                    size={16}
+                    sx={{ color: isDarkTheme ? "#FFFFFF" : "inherit" }}
+                  />
+                ) : (
+                  "Confirm"
+                )}
+              </Button>
+            </>
+          )}
+        </DialogActions>
+      </Dialog>
 
       <DelegateModal
         open={isDelegateModalOpen}
@@ -672,6 +1178,129 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
         contractId={position.contractId}
         currentDelegate={position.global_delegate}
       />
+
+      <ParticipateModal
+        open={isParticipateModalOpen}
+        onClose={() => setIsParticipateModalOpen(false)}
+        contractId={position.contractId}
+      />
+
+      <Dialog
+        maxWidth="md"
+        fullWidth
+        open={isBlockProductionModalOpen}
+        onClose={() => setIsBlockProductionModalOpen(false)}
+        PaperProps={{
+          sx: {
+            backgroundColor: isDarkTheme
+              ? "rgba(30, 30, 30, 0.95)"
+              : "rgba(255, 255, 255, 0.95)",
+            backdropFilter: "blur(10px)",
+            borderRadius: "16px",
+          },
+        }}
+      >
+        <DialogTitle>
+          <Typography variant="h6" color={isDarkTheme ? "#FFFFFF" : undefined}>
+            Block Production History
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          {isLoadingBlockData ? (
+            <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <>
+              <Box sx={{ mb: 4 }}>
+                <BlockProductionGraph
+                  data={transformDataForGraph(blockProductionData)}
+                  isDarkTheme={isDarkTheme}
+                />
+              </Box>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell
+                      sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                    >
+                      Period
+                    </TableCell>
+                    <TableCell
+                      align="right"
+                      sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                    >
+                      Blocks Produced
+                    </TableCell>
+                    <TableCell
+                      align="right"
+                      sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                    >
+                      Total Blocks
+                    </TableCell>
+                    <TableCell
+                      align="right"
+                      sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                    >
+                      Participation Rate
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {blockProductionData.map((snapshot, index) => {
+                    const blocksProduced =
+                      snapshot.proposers[position.contractAddress] || 0;
+                    const participationRate = (
+                      (blocksProduced / snapshot.total_blocks) *
+                      100
+                    ).toFixed(2);
+
+                    return (
+                      <TableRow key={index}>
+                        <TableCell
+                          sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                        >
+                          {moment(snapshot.start_date).format("MMM D")} -{" "}
+                          {moment(snapshot.end_date).format("MMM D, YYYY")}
+                        </TableCell>
+                        <TableCell
+                          align="right"
+                          sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                        >
+                          {blocksProduced.toLocaleString()}
+                        </TableCell>
+                        <TableCell
+                          align="right"
+                          sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                        >
+                          {snapshot.total_blocks.toLocaleString()}
+                        </TableCell>
+                        <TableCell
+                          align="right"
+                          sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                        >
+                          {participationRate}%
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setIsBlockProductionModalOpen(false)}
+            variant={isDarkTheme ? "outlined" : "contained"}
+            sx={{
+              color: isDarkTheme ? "#FFFFFF" : undefined,
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };
