@@ -1,30 +1,12 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Layout from "../../layouts/Default";
-import { Container, Grid, Stack, Typography } from "@mui/material";
-import { Link, useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
+import { Container } from "@mui/material";
+import { Link } from "react-router-dom";
+import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import axios from "axios";
 import styled from "styled-components";
-import { getTokens } from "../../store/tokenSlice";
-import { UnknownAction } from "@reduxjs/toolkit";
-import { getCollections } from "../../store/collectionSlice";
-import { getSales } from "../../store/saleSlice";
-import { getRankings } from "../../utils/mp";
 import NFTCollectionTable from "../../components/NFTCollectionTable";
-import { getPrices } from "../../store/dexSlice";
-import { CTCINFO_LP_WVOI_VOI } from "../../contants/dex";
-import { ARC72_INDEXER_API } from "../../config/arc72-idx";
-import { getSmartTokens } from "../../store/smartTokenSlice";
-import {
-  useCollectionInfo,
-  useCollections,
-  useListings,
-  usePrices,
-  useSales,
-  useSmartTokens,
-  useTokens,
-} from "@/components/Navbar/hooks/collections";
 
 import { GridLoader } from "react-spinners";
 import { useQuery } from "@tanstack/react-query";
@@ -108,6 +90,8 @@ type NFTCollection = {
   launchStart?: number;
   launchEnd?: number;
   maxSupply?: number;
+  featured?: number; // 0: not featured, 1: featured
+  nostats?: boolean; // 0: stats, 1: no stats
 };
 
 type NautilusResponse = {
@@ -120,7 +104,25 @@ type Listing = {
   collectionId: number;
   tokenId: string;
   deleted: boolean;
+  price: string;
   sold: boolean;
+  token?: any;
+  staking?: any;
+};
+
+// Update type definition for volume data
+type VolumeData = {
+  contractId: number;
+  vol24h: string;
+  vol7d: string;
+  vol30d: string;
+  alltime: string;
+  floor: string;
+};
+
+type VolumeResponse = {
+  "current-round": number;
+  volumes: VolumeData[];
 };
 
 // Replace useCollectionInfo with new hook
@@ -142,7 +144,21 @@ const useNautilusListings = () => {
     queryKey: ["nautilus-listings"],
     queryFn: async () => {
       const response = await axios.get<{ listings: Listing[] }>(
-        "https://arc72-voi-mainnet.nftnavigator.xyz/nft-indexer/v1/mp/listings?active=true"
+        //"https://arc72-voi-mainnet.nftnavigator.xyz/nft-indexer/v1/mp/listings?active=true"
+        "https://mainnet-idx.nautilus.sh/nft-indexer/v1/mp/listings?active=true"
+      );
+      return response.data;
+    },
+  });
+};
+
+// Update hook to fetch volume data
+const useNautilusVolumes = () => {
+  return useQuery({
+    queryKey: ["nautilus-volumes"],
+    queryFn: async () => {
+      const response = await axios.get<VolumeResponse>(
+        "https://mainnet-idx.nautilus.sh/nft-indexer/v1/mp/volumes"
       );
       return response.data;
     },
@@ -153,33 +169,71 @@ export const Collections: React.FC = () => {
   const { data: nautilusData, status: nautilusStatus } =
     useNautilusCollections();
   const { data: listingsData, status: listingsStatus } = useNautilusListings();
+  const { data: volumeData, status: volumeStatus } = useNautilusVolumes();
   const isDarkTheme = useSelector(
     (state: RootState) => state.theme.isDarkTheme
   );
 
+  console.log("nautilusData", nautilusData);
+
   const processedCollections = useMemo(() => {
     if (!nautilusData?.collections) return [];
 
+    // Add volume info mapping
+    const volumeInfo =
+      volumeData?.volumes.reduce(
+        (acc, volume) => {
+          acc[volume.contractId] = {
+            volume24h: Number(volume.vol24h) / 1_000_000,
+            volume7d: Number(volume.vol7d) / 1_000_000,
+            volume30d: Number(volume.vol30d) / 1_000_000,
+            volumeAllTime: Number(volume.alltime) / 1_000_000,
+            floor: Number(volume.floor) / 1_000_000,
+          };
+          return acc;
+        },
+        {} as Record<
+          number,
+          {
+            volume24h: number;
+            volume7d: number;
+            volume30d: number;
+            volumeAllTime: number;
+            floor: number;
+          }
+        >
+      ) || {};
+
+    console.log("listingsData", listingsData);
+
     // Create a map of active listings and floor prices by contract ID
     const listingsInfo =
-      listingsData?.listings.reduce((acc, listing) => {
-        if (!listing.deleted && !listing.sold) {
-          if (!acc[listing.collectionId]) {
-            acc[listing.collectionId] = {
-              count: 0,
-              floorPrice: Infinity,
-            };
+      listingsData?.listings
+        .filter(
+          (listing) =>
+            (!!listing.token || !!listing.staking) &&
+            listing.token.approved ===
+              "C4NGXXA22RGBDDHVR4CXC6YPGYL4KC2RSCOKLOOBDR6IEKYSJYPJX3HJZE" &&
+            listing.price !== "0"
+        )
+        .reduce((acc, listing) => {
+          if (!listing.deleted && !listing.sold) {
+            if (!acc[listing.collectionId]) {
+              acc[listing.collectionId] = {
+                count: 0,
+                floorPrice: Infinity,
+              };
+            }
+            acc[listing.collectionId].count += 1;
+            // Assuming the listing price is in microVOI
+            const price = Number(listing.price || 0) / 1_000_000;
+            acc[listing.collectionId].floorPrice = Math.min(
+              acc[listing.collectionId].floorPrice,
+              price
+            );
           }
-          acc[listing.collectionId].count += 1;
-          // Assuming the listing price is in microVOI
-          const price = Number(listing.price || 0) / 1_000_000;
-          acc[listing.collectionId].floorPrice = Math.min(
-            acc[listing.collectionId].floorPrice,
-            price
-          );
-        }
-        return acc;
-      }, {} as Record<number, { count: number; floorPrice: number }>) || {};
+          return acc;
+        }, {} as Record<number, { count: number; floorPrice: number }>) || {};
 
     // Add console.log to debug
     console.log("Listings info:", listingsInfo);
@@ -191,9 +245,36 @@ export const Collections: React.FC = () => {
       return url;
     };
 
-    const excludedCollections = [411530, 846601, 876578, 404576, 797609];
+    const excludedCollections = [
+      //421076, // Nautilus Locked Voi
+      404576,
+      411530, // Nautilus Voi Staking
+      //797609, // .voi Registrar
+      846601,
+      876578, // Staking Registrar
+    ];
 
-    const result = nautilusData.collections
+    const mixinCollections = [
+      {
+        contractId: 421076,
+        name: "Nautilus Locked Voi",
+        description: "Nautilus Locked Voi",
+        image:
+          "https://ipfs.io/ipfs/QmSKyaq1r71DjhV8pUZiBAKkCwB4yQ8xYSQjFS8YEaEdFL",
+        isBlacklisted: 0,
+        totalSupply: 1,
+        uniqueOwners: 1,
+        creator: "IX3ZPAWOIDIGDFT3DSUDOC76ZPYWRX7DHQECWS2OJBV2WMSY3THB3ZCUQI",
+        globalState: [],
+        mintRound: 0,
+        burnedSupply: 0,
+        firstToken: null,
+        featured: 1,
+        nostats: 1,
+      },
+    ];
+
+    const result = [...nautilusData.collections, ...mixinCollections]
       .filter(
         (collection) =>
           !collection.isBlacklisted &&
@@ -206,7 +287,11 @@ export const Collections: React.FC = () => {
         let description = "";
 
         try {
-          if (collection.firstToken?.metadata) {
+          if (collection?.image) {
+            image = collection.image;
+            name = collection?.name || "";
+            description = collection?.description || "";
+          } else if (collection.firstToken?.metadata) {
             const metadata = JSON.parse(collection.firstToken.metadata);
             image = resolveIpfsUrl(metadata.image || "");
             name = (metadata.name || "").replace(/\s*[#~]*\d+$/, "");
@@ -240,13 +325,33 @@ export const Collections: React.FC = () => {
             listingsInfo[collection.contractId]?.floorPrice === Infinity
               ? null
               : listingsInfo[collection.contractId]?.floorPrice || null,
+          featured:
+            collection.featured || [797609].includes(collection.contractId)
+              ? 1
+              : 0,
+          nostats: collection.nostats || 0,
+          volume24h: volumeInfo[collection.contractId]?.volume24h || 0,
+          volume7d: volumeInfo[collection.contractId]?.volume7d || 0,
+          volume30d: volumeInfo[collection.contractId]?.volume30d || 0,
+          volumeAllTime: volumeInfo[collection.contractId]?.volumeAllTime || 0,
+          floor: volumeInfo[collection.contractId]?.floor || 0,
         };
       })
       .sort((a, b) => (b.activeListings || 0) - (a.activeListings || 0));
 
     console.log("Processed collections:", result);
     return result;
-  }, [nautilusData, listingsData]);
+  }, [nautilusData, listingsData, volumeData]);
+
+  const [creatorFilter, setCreatorFilter] = useState<string | undefined>(
+    undefined
+  );
+  const [filteredCollections, setFilteredCollections] =
+    useState(processedCollections);
+
+  useEffect(() => {
+    setFilteredCollections(processedCollections);
+  }, [processedCollections]);
 
   // Add loading and error states
   if (
@@ -300,7 +405,21 @@ export const Collections: React.FC = () => {
           </SectionDescription>
         </SectionHeading>
         {processedCollections.length > 0 ? (
-          <NFTCollectionTable collections={processedCollections} />
+          <NFTCollectionTable
+            collections={filteredCollections}
+            creatorFilter={creatorFilter}
+            onCreatorFilter={(creator) => {
+              setCreatorFilter(creator);
+              // Filter logic here
+              if (!!creator) {
+                setFilteredCollections(
+                  processedCollections.filter((c) => c.creator === creator)
+                );
+              } else {
+                setFilteredCollections(processedCollections);
+              }
+            }}
+          />
         ) : (
           <div>No collections found</div>
         )}

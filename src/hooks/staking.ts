@@ -4,6 +4,7 @@ import { stakingRewards } from "@/static/staking/staking";
 import { getStakingWithdrawableAmount } from "@/utils/staking";
 import { getAlgorandClients } from "@/wallets";
 import { useQuery, QueryClient } from "@tanstack/react-query";
+import algosdk from "algosdk";
 import axios from "axios";
 
 const { algodClient } = getAlgorandClients();
@@ -73,13 +74,17 @@ export const useStakingContract = (
       const [account] = addRewardEstimates(accounts);
 
       if (opts?.includeWithdrawable) {
+        const accInfo = await algodClient
+          .accountInformation(algosdk.getApplicationAddress(account.contractId))
+          .do();
         const withdrawable = await getStakingWithdrawableAmount(
           algodClient,
-          contractId,
+          Number(contractId),
           account.global_owner
         );
         return {
           ...account,
+          value: accInfo.amount,
           withdrawable: withdrawable.toString(),
           unlockTime:
             account.global_funding +

@@ -448,7 +448,7 @@ const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
       </StyledTabs>
       <CustomTabPanel value={value} index={0}>
         <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
-          {/*<Button
+          <Button
             variant="contained"
             onClick={handleWithdrawAllClick}
             sx={{
@@ -458,7 +458,6 @@ const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
           >
             Withdraw All
           </Button>
-          */}
         </Box>
         <TableContainer component={Paper} style={tableStyle}>
           <Table>
@@ -527,7 +526,7 @@ const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
       </CustomTabPanel>
       <CustomTabPanel value={value} index={1}>
         <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
-          {/*<Button
+          <Button
             variant="contained"
             onClick={handleWithdrawAllClick}
             sx={{
@@ -537,7 +536,6 @@ const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
           >
             Withdraw All
           </Button>
-          */}
         </Box>
         <TableContainer component={Paper} style={tableStyle}>
           <Table>

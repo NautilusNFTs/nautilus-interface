@@ -21,6 +21,9 @@ import {
   Table,
   TableHead,
   TableBody,
+  Stepper,
+  Step,
+  StepLabel,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import moment from "moment";
@@ -44,9 +47,11 @@ import {
   UserIcon,
   PowerIcon,
   BarChart3Icon,
+  CoinsIcon,
 } from "lucide-react";
 import BlockProductionGraph from "@/pages/CommunityChest/components/BlockProductionGraph";
 import { useBlocks } from "@/hooks/useBlocks";
+import { abi } from "ulujs";
 
 // format number using Intl.NumberFormat
 // 100.12342 -> 100
@@ -336,6 +341,534 @@ interface BlockProductionData {
   ballast_blocks: number;
 }
 
+// Add new type for minting steps
+type MintStep = 1 | 2 | 3;
+
+// Update MintModal component
+const MintModal: React.FC<{
+  open: boolean;
+  onClose: () => void;
+  contractId: string;
+  onMint: () => Promise<void>;
+  isMinting: boolean;
+  position: {
+    contractId: string;
+    tokenId: string;
+    contractAddress: string;
+    withdrawable: string;
+    global_delegate: string;
+    global_owner: string;
+    part_vote_lst: number;
+  };
+  stakingData: any;
+}> = ({
+  open,
+  onClose,
+  contractId,
+  onMint,
+  isMinting,
+  position,
+  stakingData,
+}) => {
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => toast.success(`${label} copied to clipboard`))
+      .catch(() => toast.error("Failed to copy to clipboard"));
+  };
+  const { isDarkTheme } = useSelector((state: RootState) => state.theme);
+  const [currentStep, setCurrentStep] = useState<MintStep>(1);
+  const [selectedOption, setSelectedOption] = useState<
+    "own" | "service" | null
+  >(null);
+  const [nodeAddress, setNodeAddress] = useState<string>(position.global_owner);
+
+  const handleBack = () => {
+    setCurrentStep((prev) => (prev > 1 ? ((prev - 1) as MintStep) : prev));
+  };
+
+  const handleNext = () => {
+    if (currentStep === 2 && selectedOption === "own" && !nodeAddress) {
+      toast.error("Please enter your node address");
+      return;
+    }
+    setCurrentStep((prev) => (prev < 3 ? ((prev + 1) as MintStep) : prev));
+  };
+
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <Box sx={{ py: 2 }}>
+            <Typography
+              color={isDarkTheme ? "#FFFFFF" : undefined}
+              gutterBottom
+            >
+              Staking Contract Information:
+            </Typography>
+            <Box sx={{ pl: 2 }}>
+              <Typography
+                color={isDarkTheme ? "#FFFFFF" : undefined}
+                gutterBottom
+              >
+                • Contract ID:{" "}
+                <Box
+                  component="span"
+                  sx={{ display: "inline-flex", alignItems: "center" }}
+                >
+                  <Link
+                    href={`https://block.voi.network/explorer/application/${position.contractId}/global-state`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{
+                      color: "inherit",
+                      textDecoration: "underline",
+                      "&:hover": { opacity: 0.8 },
+                    }}
+                  >
+                    {position.contractId}
+                  </Link>
+                  <ContentCopyIcon
+                    style={{
+                      cursor: "pointer",
+                      marginLeft: "5px",
+                      fontSize: "16px",
+                      color: "inherit",
+                    }}
+                    onClick={() =>
+                      copyToClipboard(position.contractId, "Contract ID")
+                    }
+                  />
+                </Box>
+              </Typography>
+              <Typography
+                color={isDarkTheme ? "#FFFFFF" : undefined}
+                gutterBottom
+              >
+                • Contract Address:{" "}
+                <Box
+                  component="span"
+                  sx={{ display: "inline-flex", alignItems: "center" }}
+                >
+                  <Link
+                    href={`https://block.voi.network/explorer/account/${position.contractAddress}/transactions`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{
+                      color: "inherit",
+                      textDecoration: "underline",
+                      "&:hover": { opacity: 0.8 },
+                    }}
+                  >
+                    {`${position.contractAddress.slice(
+                      0,
+                      6
+                    )}...${position.contractAddress.slice(-6)}`}
+                  </Link>
+                  <ContentCopyIcon
+                    style={{
+                      cursor: "pointer",
+                      marginLeft: "5px",
+                      fontSize: "16px",
+                      color: "inherit",
+                    }}
+                    onClick={() =>
+                      copyToClipboard(
+                        position.contractAddress,
+                        "Contract Address"
+                      )
+                    }
+                  />
+                </Box>
+              </Typography>
+              <Typography
+                color={isDarkTheme ? "#FFFFFF" : undefined}
+                gutterBottom
+              >
+                • Current Delegate:{" "}
+                <Box
+                  component="span"
+                  sx={{ display: "inline-flex", alignItems: "center" }}
+                >
+                  <Link
+                    href={`https://block.voi.network/explorer/account/${position.global_delegate}/transactions`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{
+                      color: "inherit",
+                      textDecoration: "underline",
+                      "&:hover": { opacity: 0.8 },
+                    }}
+                  >
+                    {`${position.global_delegate.slice(
+                      0,
+                      6
+                    )}...${position.global_delegate.slice(-6)}`}
+                  </Link>
+                  <ContentCopyIcon
+                    style={{
+                      cursor: "pointer",
+                      marginLeft: "5px",
+                      fontSize: "16px",
+                      color: "inherit",
+                    }}
+                    onClick={() =>
+                      copyToClipboard(
+                        position.global_delegate,
+                        "Delegate Address"
+                      )
+                    }
+                  />
+                </Box>
+              </Typography>
+              <Typography
+                color={isDarkTheme ? "#FFFFFF" : undefined}
+                gutterBottom
+              >
+                • Total Staked: {formatNumber(stakingData.value / 1e6)} VOI
+              </Typography>
+              <Typography
+                color={isDarkTheme ? "#FFFFFF" : undefined}
+                gutterBottom
+              >
+                • Withdrawable: {Number(stakingData.withdrawable) / 1e6} VOI
+              </Typography>
+              <Typography color={isDarkTheme ? "#FFFFFF" : undefined}>
+                • Unlock Time:{" "}
+                {moment.unix(getStakingUnlockTime(position)).fromNow()}
+              </Typography>
+              <Typography
+                color={
+                  isDarkTheme ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.6)"
+                }
+                sx={{ mt: 2 }}
+              >
+                View detailed profitability analysis on{" "}
+                <Link
+                  href={`https://voirewards.com/wallet/${position.contractAddress}#calculator`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  sx={{
+                    color: isDarkTheme ? "#90caf9" : "#1976d2",
+                    textDecoration: "none",
+                    "&:hover": {
+                      textDecoration: "underline",
+                    },
+                  }}
+                >
+                  Voi Rewards Auditor
+                </Link>
+              </Typography>
+            </Box>
+          </Box>
+        );
+
+      case 2:
+        return (
+          <Box sx={{ py: 2 }}>
+            <Typography
+              color={isDarkTheme ? "#FFFFFF" : undefined}
+              gutterBottom
+            >
+              Select Your Staking Option:
+            </Typography>
+            <Box sx={{ display: "flex", gap: 2, mt: 2 }}>
+              <Button
+                variant={selectedOption === "own" ? "contained" : "outlined"}
+                onClick={() => setSelectedOption("own")}
+                sx={{
+                  flex: 1,
+                  p: 3,
+                  borderRadius: 2,
+                  color: isDarkTheme ? "#FFFFFF" : undefined,
+                  borderColor: isDarkTheme
+                    ? "rgba(255, 255, 255, 0.23)"
+                    : undefined,
+                }}
+              >
+                <Box>
+                  <PowerIcon size={24} />
+                  <Typography sx={{ mt: 1 }}>Stake on Own Node</Typography>
+                </Box>
+              </Button>
+              <Button
+                variant={
+                  selectedOption === "service" ? "contained" : "outlined"
+                }
+                onClick={() => setSelectedOption("service")}
+                sx={{
+                  flex: 1,
+                  p: 3,
+                  borderRadius: 2,
+                  color: isDarkTheme ? "#FFFFFF" : undefined,
+                  borderColor: isDarkTheme
+                    ? "rgba(255, 255, 255, 0.23)"
+                    : undefined,
+                }}
+              >
+                <Box>
+                  <CoinsIcon size={24} />
+                  <Typography sx={{ mt: 1 }}>Node as a Service</Typography>
+                </Box>
+              </Button>
+            </Box>
+            {selectedOption === "own" && (
+              <Box sx={{ mt: 3 }}>
+                <TextField
+                  fullWidth
+                  label="Node Address"
+                  value={nodeAddress}
+                  onChange={(e) => setNodeAddress(e.target.value)}
+                  placeholder="Enter your node address"
+                  sx={{
+                    "& .MuiInputLabel-root": {
+                      color: isDarkTheme
+                        ? "rgba(255, 255, 255, 0.7)"
+                        : undefined,
+                    },
+                    "& .MuiOutlinedInput-root": {
+                      color: isDarkTheme ? "#FFFFFF" : undefined,
+                      "& fieldset": {
+                        borderColor: isDarkTheme
+                          ? "rgba(255, 255, 255, 0.23)"
+                          : undefined,
+                      },
+                      "&:hover fieldset": {
+                        borderColor: isDarkTheme
+                          ? "rgba(255, 255, 255, 0.4)"
+                          : undefined,
+                      },
+                    },
+                  }}
+                />
+                <Typography
+                  variant="caption"
+                  sx={{
+                    display: "block",
+                    mt: 1,
+                    color: isDarkTheme
+                      ? "rgba(255, 255, 255, 0.7)"
+                      : "rgba(0, 0, 0, 0.6)",
+                  }}
+                >
+                  Enter the Algorand address of your participation node
+                </Typography>
+              </Box>
+            )}
+            {selectedOption === "service" && (
+              <Box
+                sx={{
+                  mt: 3,
+                  p: 2,
+                  borderRadius: 2,
+                  backgroundColor: isDarkTheme
+                    ? "rgba(255, 255, 255, 0.05)"
+                    : "rgba(0, 0, 0, 0.05)",
+                }}
+              >
+                <Typography
+                  sx={{
+                    color: isDarkTheme
+                      ? "rgba(255, 255, 255, 0.7)"
+                      : "rgba(0, 0, 0, 0.7)",
+                    lineHeight: 1.6,
+                  }}
+                >
+                  The node service is provided free of charge with a 10% fee
+                  applied only to generated block rewards.
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        );
+
+      case 3:
+        return (
+          <Box sx={{ py: 2 }}>
+            {isMinting ? (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <CircularProgress
+                  size={100}
+                  sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                />
+                <Typography
+                  variant="h6"
+                  color={isDarkTheme ? "#FFFFFF" : undefined}
+                >
+                  Minting in progress...
+                </Typography>
+              </Box>
+            ) : (
+              <>
+                <Typography
+                  color={isDarkTheme ? "#FFFFFF" : undefined}
+                  gutterBottom
+                >
+                  Confirm Your Selection:
+                </Typography>
+                <Box sx={{ pl: 2 }}>
+                  <Typography
+                    color={isDarkTheme ? "#FFFFFF" : undefined}
+                    gutterBottom
+                  >
+                    • Contract ID: {contractId}
+                  </Typography>
+                  <Typography
+                    color={isDarkTheme ? "#FFFFFF" : undefined}
+                    gutterBottom
+                  >
+                    • Staking Option:{" "}
+                    {selectedOption === "own"
+                      ? "Own Node"
+                      : "Node as a Service"}
+                  </Typography>
+                  {selectedOption === "own" && (
+                    <Typography
+                      color={isDarkTheme ? "#FFFFFF" : undefined}
+                      gutterBottom
+                    >
+                      • Delegate Address:{" "}
+                      <Box
+                        component="span"
+                        sx={{ display: "inline-flex", alignItems: "center" }}
+                      >
+                        {nodeAddress.slice(0, 6)}...{nodeAddress.slice(-6)}
+                        <ContentCopyIcon
+                          style={{
+                            cursor: "pointer",
+                            marginLeft: "5px",
+                            fontSize: "16px",
+                            color: "inherit",
+                          }}
+                          onClick={() =>
+                            copyToClipboard(nodeAddress, "Delegate Address")
+                          }
+                        />
+                      </Box>
+                    </Typography>
+                  )}
+                  <Typography color={isDarkTheme ? "#FFFFFF" : undefined}>
+                    • Transaction Fee: {0.003 * 2 + 100.3367} VOI
+                  </Typography>
+                </Box>
+              </>
+            )}
+          </Box>
+        );
+    }
+  };
+
+  const steps = [
+    "Contract Information",
+    "Select Staking Option",
+    "Confirm & Mint",
+  ];
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: {
+          backgroundColor: isDarkTheme
+            ? "rgba(30, 30, 30, 0.95)"
+            : "rgba(255, 255, 255, 0.95)",
+          backdropFilter: "blur(10px)",
+          borderRadius: "16px",
+        },
+      }}
+    >
+      <DialogTitle>
+        <Typography variant="h6" color={isDarkTheme ? "#FFFFFF" : undefined}>
+          Mint NFT
+        </Typography>
+        <Stepper
+          activeStep={currentStep - 1}
+          sx={{
+            mt: 2,
+            "& .MuiStepLabel-label": {
+              color: isDarkTheme ? "rgba(255, 255, 255, 0.5)" : undefined,
+              "&.Mui-active": {
+                color: isDarkTheme ? "#FFFFFF" : undefined,
+              },
+              "&.Mui-completed": {
+                color: isDarkTheme ? "rgba(255, 255, 255, 0.7)" : undefined,
+              },
+            },
+            "& .MuiStepIcon-root": {
+              color: isDarkTheme ? "rgba(255, 255, 255, 0.3)" : undefined,
+              "&.Mui-active": {
+                color: isDarkTheme ? "#FFFFFF" : undefined,
+              },
+              "&.Mui-completed": {
+                color: isDarkTheme ? "rgba(255, 255, 255, 0.7)" : undefined,
+              },
+            },
+          }}
+        >
+          {steps.map((label) => (
+            <Step key={label}>
+              <StepLabel>{label}</StepLabel>
+            </Step>
+          ))}
+        </Stepper>
+      </DialogTitle>
+      <DialogContent>{renderStepContent()}</DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        {!isMinting && (
+          <>
+            <Button
+              onClick={onClose}
+              variant={isDarkTheme ? "outlined" : "contained"}
+              sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+            >
+              Cancel
+            </Button>
+            <Box sx={{ flex: 1 }} />
+            {currentStep > 1 && (
+              <Button
+                onClick={handleBack}
+                variant={isDarkTheme ? "outlined" : "contained"}
+                sx={{ color: isDarkTheme ? "#FFFFFF" : undefined, mr: 1 }}
+              >
+                Back
+              </Button>
+            )}
+            {currentStep < 3 ? (
+              <Button
+                onClick={handleNext}
+                variant={isDarkTheme ? "outlined" : "contained"}
+                sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                disabled={currentStep === 2 && !selectedOption}
+              >
+                Next
+              </Button>
+            ) : (
+              <Button
+                onClick={onMint}
+                variant={isDarkTheme ? "outlined" : "contained"}
+                sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                disabled={isMinting}
+              >
+                Confirm & Mint
+              </Button>
+            )}
+          </>
+        )}
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
   const {
     data: blocksData,
@@ -620,10 +1153,182 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
     }));
   };
 
+  const [isMinting, setIsMinting] = useState(false);
+
+  const handleMint = async () => {
+    if (!activeAccount) {
+      toast.error("Please connect your wallet");
+      return;
+    }
+    try {
+      setIsMinting(true);
+      const { algodClient, indexerClient } = getAlgorandClients();
+      const apid = 421076;
+      const to = activeAccount.address;
+      const tokenId = Number(position.contractId);
+      const ci = new CONTRACT(apid, algodClient, indexerClient, abi.custom, {
+        addr: activeAccount.address,
+        sk: new Uint8Array(0),
+      });
+      const builder = {
+        arc72: new CONTRACT(
+          apid,
+          algodClient,
+          indexerClient,
+          {
+            name: "OSARC72Token",
+            methods: [
+              {
+                name: "mint",
+                args: [
+                  {
+                    type: "address",
+                    name: "to",
+                  },
+                  {
+                    type: "uint64",
+                    name: "tokenId",
+                  },
+                  {
+                    type: "address",
+                    name: "delegate",
+                  },
+                ],
+                readonly: false,
+                returns: {
+                  type: "uint256",
+                },
+                desc: "Mint a new NFT",
+              },
+            ],
+            events: [],
+          },
+          {
+            addr: activeAccount.address,
+            sk: new Uint8Array(0),
+          },
+          true,
+          false,
+          true
+        ),
+        ownable: new CONTRACT(
+          tokenId,
+          algodClient,
+          indexerClient,
+          {
+            name: "Ownable",
+            methods: [
+              {
+                name: "transfer",
+                args: [
+                  {
+                    type: "address",
+                    name: "new_owner",
+                  },
+                ],
+                readonly: false,
+                returns: {
+                  type: "void",
+                },
+              },
+            ],
+            events: [],
+          },
+          {
+            addr: activeAccount.address,
+            sk: new Uint8Array(0),
+          },
+          true,
+          false,
+          true
+        ),
+      };
+      const buildN = [];
+      const txnO = (
+        await builder.ownable.transfer(algosdk.getApplicationAddress(apid))
+      ).obj;
+      buildN.push({
+        ...txnO,
+        note: new TextEncoder().encode(
+          `transfer ownership of ${
+            position.contractId
+          } to: ${algosdk.getApplicationAddress(apid)}`
+        ),
+      });
+      const delegate =
+        "7REOQMRXHEFIETBIRWXJS7ZE6X7FZCNYPK7GFQMRRZE6NVZT426U7ZESQ4";
+      const txn1 = (await builder.arc72.mint(to, tokenId, delegate)).obj;
+      const note1 = new TextEncoder().encode(
+        `mint to: ${to} tokenId: ${tokenId} delegate: ${delegate}`
+      );
+      console.log({ mint: txn1 });
+      buildN.push({
+        ...txn1,
+        payment: 336700 + 100 * 1e6,
+        note: note1,
+      });
+      ci.setFee(3000);
+      ci.setEnableGroupResourceSharing(true);
+      ci.setExtraTxns(buildN);
+      ci.setGroupResourceSharingStrategy("merge");
+      const customR = await ci.custom();
+      if (!customR.success) {
+        console.log({ customR });
+        throw new Error("Mint failed in simulate");
+      }
+
+      const stxns = await signTransactions(
+        customR.txns.map(
+          (t: string) => new Uint8Array(Buffer.from(t, "base64"))
+        )
+      );
+
+      const { txId } = await algodClient
+        .sendRawTransaction(stxns as Uint8Array[])
+        .do();
+
+      await waitForConfirmation(algodClient, txId, 4);
+
+      await refetch();
+      setIsMintModalOpen(false);
+
+      // Set success state
+      setSuccessTxId(txId);
+      setIsSuccessModalOpen(true);
+
+      party.confetti(document.body, {
+        count: party.variation.range(200, 300),
+        size: party.variation.range(1, 1.4),
+      });
+
+      toast.success("Successfully minted staking NFT");
+    } catch (error) {
+      console.error("Error minting:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to mint rewards"
+      );
+    } finally {
+      setIsMinting(false);
+      handleClose();
+    }
+  };
+
+  const [isMintModalOpen, setIsMintModalOpen] = useState(false);
+
+  // Update the menu item click handler
+  const handleMintClick = () => {
+    setIsMintModalOpen(true);
+    handleClose();
+  };
+
+  // Add new state for success modal
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [successTxId, setSuccessTxId] = useState<string>("");
+
   if (isLoading) {
     return (
       <TableRow>
-        <TableCell style={cellStyleWithColor} colSpan={6} align="right">
+        <TableCell style={cellStyleWithColor} colSpan={9} align="right">
           <Skeleton variant="text" />
         </TableCell>
       </TableRow>
@@ -922,6 +1627,17 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
               {!position.part_vote_lst ? "Go Online" : "Update Participation"}
             </MenuItem>
             <MenuItem
+              onClick={handleMintClick}
+              disabled={isMinting}
+              sx={{
+                color: isDarkTheme ? "#FFFFFF" : undefined,
+                gap: 1.5,
+              }}
+            >
+              <CoinsIcon size={18} />
+              {isMinting ? "Minting..." : "Mint NFT"}
+            </MenuItem>
+            <MenuItem
               onClick={() => {
                 fetchBlockProductionData(position.contractAddress);
                 setIsBlockProductionModalOpen(true);
@@ -1212,6 +1928,31 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
             </Box>
           ) : (
             <>
+              <Box sx={{ mb: 2 }}>
+                <Typography
+                  variant="body2"
+                  color={
+                    isDarkTheme ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.6)"
+                  }
+                  sx={{ mb: 2 }}
+                >
+                  View detailed profitability analysis on{" "}
+                  <Link
+                    href={`https://voirewards.com/wallet/${position.contractAddress}#calculator`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{
+                      color: isDarkTheme ? "#90caf9" : "#1976d2",
+                      textDecoration: "none",
+                      "&:hover": {
+                        textDecoration: "underline",
+                      },
+                    }}
+                  >
+                    Voi Rewards Auditor
+                  </Link>
+                </Typography>
+              </Box>
               <Box sx={{ mb: 4 }}>
                 <BlockProductionGraph
                   data={transformDataForGraph(blockProductionData)}
@@ -1292,6 +2033,74 @@ const PositionRow: React.FC<PositionRowProps> = ({ position, cellStyle }) => {
         <DialogActions>
           <Button
             onClick={() => setIsBlockProductionModalOpen(false)}
+            variant={isDarkTheme ? "outlined" : "contained"}
+            sx={{
+              color: isDarkTheme ? "#FFFFFF" : undefined,
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <MintModal
+        open={isMintModalOpen}
+        onClose={() => setIsMintModalOpen(false)}
+        contractId={position.contractId}
+        onMint={handleMint}
+        isMinting={isMinting}
+        position={position}
+        stakingData={data}
+      />
+
+      <Dialog
+        open={isSuccessModalOpen}
+        onClose={() => setIsSuccessModalOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            backgroundColor: isDarkTheme
+              ? "rgba(30, 30, 30, 0.95)"
+              : "rgba(255, 255, 255, 0.95)",
+            backdropFilter: "blur(10px)",
+            borderRadius: "16px",
+          },
+        }}
+      >
+        <DialogTitle>
+          <Typography variant="h6" color={isDarkTheme ? "#FFFFFF" : undefined}>
+            NFT Minted Successfully!
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ py: 2, textAlign: "center" }}>
+            <Typography
+              color={isDarkTheme ? "#FFFFFF" : undefined}
+              gutterBottom
+            >
+              Your staking NFT has been minted successfully. <br />
+              View the transaction details below:
+            </Typography>
+            <Link
+              href={`https://block.voi.network/explorer/transaction/${successTxId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{
+                color: isDarkTheme ? "#90caf9" : "#1976d2",
+                textDecoration: "none",
+                "&:hover": {
+                  textDecoration: "underline",
+                },
+              }}
+            >
+              View Transaction in Explorer
+            </Link>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setIsSuccessModalOpen(false)}
             variant={isDarkTheme ? "outlined" : "contained"}
             sx={{
               color: isDarkTheme ? "#FFFFFF" : undefined,

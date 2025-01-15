@@ -59,6 +59,7 @@ import NorthEastIcon from "@mui/icons-material/NorthEast";
 import PositionContainer from "./components/PositionContainer";
 import MarketContainer from "./components/MarketContainer";
 import { styled as mStyled } from "@mui/material/styles";
+import MintContainer from "./components/MintContainer";
 
 const PriceRangeContainer = styled.div`
   display: flex;
@@ -726,6 +727,7 @@ export const Staking: React.FC = () => {
         >
           <Tab label="Market" />
           <Tab label="Positions" />
+          {/*<Tab label="Mint" />*/}
         </StyledTabs>
 
         {selectedTab === 0 && (
@@ -738,6 +740,11 @@ export const Staking: React.FC = () => {
             <PositionContainer />
           </div>
         )}
+        {/*selectedTab === 2 && (
+          <div style={{ marginTop: "20px" }}>
+            <MintContainer />
+          </div>
+        )*/}
       </Layout>
     </>
   );

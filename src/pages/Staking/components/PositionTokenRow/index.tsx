@@ -47,6 +47,7 @@ import {
   UserIcon,
   PowerIcon,
   BarChart3Icon,
+  FlameIcon,
 } from "lucide-react";
 import BlockProductionGraph from "@/pages/CommunityChest/components/BlockProductionGraph";
 import { useBlocks } from "@/hooks/useBlocks";
@@ -359,6 +360,9 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
   const [maxAmount, setMaxAmount] = useState<number>(0);
   const [isDepositLoading, setIsDepositLoading] = useState(false);
   const [isWithdrawLoading, setIsWithdrawLoading] = useState(false);
+  const [isBurnLoading, setIsBurnLoading] = useState(false);
+  const [isBurnModalOpen, setIsBurnModalOpen] = useState(false);
+  const [successTxId, setSuccessTxId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCurrentRound = async () => {
@@ -432,7 +436,7 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
       ci.setFee(5000);
       const withdrawR2 = await ci.withdraw(
         Number(nft.tokenId),
-        BigInt(withdrawAmount * 1e6)  // Convert VOI to microVOI
+        BigInt(withdrawAmount * 1e6) // Convert VOI to microVOI
       );
       if (!withdrawR2.success) {
         console.error({ withdrawR2 });
@@ -693,6 +697,69 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
     }));
   };
 
+  const handleBurnToken = async () => {
+    if (!activeAccount) {
+      toast.error("Please connect your wallet");
+      return;
+    }
+
+    setIsBurnLoading(true);
+    try {
+      const ci = new CONTRACT(
+        Number(nft.contractId),
+        algodClient,
+        undefined,
+        {
+          name: "NautilusVoiStaking",
+          methods: [
+            {
+              name: "burn",
+              args: [{ type: "uint64", name: "tokenId" }],
+              returns: { type: "void" },
+              desc: "Burn staking position token.",
+            },
+          ],
+          events: [],
+        },
+        { addr: activeAccount.address, sk: new Uint8Array(0) }
+      );
+
+      ci.setFee(5000);
+      const burnResult = await ci.burn(Number(nft.tokenId));
+
+      if (!burnResult.success) {
+        console.error({ burnResult });
+        throw new Error("Burn failed in simulate");
+      }
+
+      const stxns = await signTransactions(
+        burnResult.txns.map(
+          (txn: string) => new Uint8Array(Buffer.from(txn, "base64"))
+        )
+      );
+
+      const { txId } = await algodClient
+        .sendRawTransaction(stxns as Uint8Array[])
+        .do();
+
+      await algosdk.waitForConfirmation(algodClient, txId, 4);
+      await refetch();
+      setSuccessTxId(txId);
+      setIsBurnModalOpen(false);
+      party.confetti(document.body, {
+        count: party.variation.range(200, 300),
+        size: party.variation.range(1, 1.4),
+      });
+    } catch (error) {
+      console.error("Error burning token:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to burn token"
+      );
+    } finally {
+      setIsBurnLoading(false);
+    }
+  };
+
   return (
     <>
       <TableRow
@@ -700,7 +767,7 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
         style={index === arc72TokensLength - 1 ? lastRowStyle : undefined}
       >
         {isLoading ? (
-          <TableCell style={cellStyleWithColor} colSpan={6} align="right">
+          <TableCell style={cellStyleWithColor} colSpan={9} align="right">
             <Skeleton variant="text" />
           </TableCell>
         ) : (
@@ -928,11 +995,13 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
                     <ListItemText primary="Withdraw" />
                   </MenuItem>
                 )}
-                <MenuItem onClick={() => {
-                  fetchBlockProductionData(nft.staking.contractAddress);
-                  setIsBlockProductionModalOpen(true);
-                  setAnchorEl(null);
-                }}>
+                <MenuItem
+                  onClick={() => {
+                    fetchBlockProductionData(nft.staking.contractAddress);
+                    setIsBlockProductionModalOpen(true);
+                    setAnchorEl(null);
+                  }}
+                >
                   <ListItemIcon>
                     <BarChart3Icon />
                   </ListItemIcon>
@@ -949,6 +1018,12 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
                     <PowerIcon />
                   </ListItemIcon>
                   <ListItemText primary="Participate" />
+                </MenuItem>
+                <MenuItem onClick={() => setIsBurnModalOpen(true)}>
+                  <ListItemIcon>
+                    <FlameIcon />
+                  </ListItemIcon>
+                  <ListItemText primary="Burn Token" />
                 </MenuItem>
               </Menu>
             </TableCell>
@@ -1137,7 +1212,7 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
                     }}
                   />
                   <Button
-                    onClick={() => 
+                    onClick={() =>
                       setWithdrawAmount(Number(data?.withdrawable || 0) / 1e6)
                     }
                     variant={isDarkTheme ? "outlined" : "contained"}
@@ -1195,7 +1270,9 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
         onClose={() => setIsBlockProductionModalOpen(false)}
         PaperProps={{
           sx: {
-            backgroundColor: isDarkTheme ? "rgba(30, 30, 30, 0.95)" : "rgba(255, 255, 255, 0.95)",
+            backgroundColor: isDarkTheme
+              ? "rgba(30, 30, 30, 0.95)"
+              : "rgba(255, 255, 255, 0.95)",
             backdropFilter: "blur(10px)",
             borderRadius: "16px",
           },
@@ -1222,38 +1299,64 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
+                    <TableCell
+                      sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                    >
                       Period
                     </TableCell>
-                    <TableCell align="right" sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
+                    <TableCell
+                      align="right"
+                      sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                    >
                       Blocks Produced
                     </TableCell>
-                    <TableCell align="right" sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
+                    <TableCell
+                      align="right"
+                      sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                    >
                       Total Blocks
                     </TableCell>
-                    <TableCell align="right" sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
+                    <TableCell
+                      align="right"
+                      sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                    >
                       Participation Rate
                     </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {blockProductionData.map((snapshot, index) => {
-                    const blocksProduced = snapshot.proposers[nft.staking.contractAddress] || 0;
-                    const participationRate = ((blocksProduced / snapshot.total_blocks) * 100).toFixed(2);
+                    const blocksProduced =
+                      snapshot.proposers[nft.staking.contractAddress] || 0;
+                    const participationRate = (
+                      (blocksProduced / snapshot.total_blocks) *
+                      100
+                    ).toFixed(2);
 
                     return (
                       <TableRow key={index}>
-                        <TableCell sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
+                        <TableCell
+                          sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                        >
                           {moment(snapshot.start_date).format("MMM D")} -{" "}
                           {moment(snapshot.end_date).format("MMM D, YYYY")}
                         </TableCell>
-                        <TableCell align="right" sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
+                        <TableCell
+                          align="right"
+                          sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                        >
                           {blocksProduced.toLocaleString()}
                         </TableCell>
-                        <TableCell align="right" sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
+                        <TableCell
+                          align="right"
+                          sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                        >
                           {snapshot.total_blocks.toLocaleString()}
                         </TableCell>
-                        <TableCell align="right" sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
+                        <TableCell
+                          align="right"
+                          sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                        >
                           {participationRate}%
                         </TableCell>
                       </TableRow>
@@ -1271,6 +1374,141 @@ const PositionTokenRow: React.FC<PositionTokenRowProps> = ({
             sx={{
               color: isDarkTheme ? "#FFFFFF" : undefined,
             }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        maxWidth="xs"
+        fullWidth
+        open={isBurnModalOpen}
+        onClose={() => setIsBurnModalOpen(false)}
+        PaperProps={{
+          sx: {
+            backgroundColor: isDarkTheme
+              ? "rgba(30, 30, 30, 0.95)"
+              : "rgba(255, 255, 255, 0.95)",
+            backdropFilter: "blur(10px)",
+            borderRadius: "16px",
+          },
+        }}
+      >
+        <DialogTitle>
+          <Typography variant="h6" color={isDarkTheme ? "#FFFFFF" : undefined}>
+            Burn Token
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ py: 2 }}>
+            {isBurnLoading ? (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <CircularProgress
+                  size={100}
+                  sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+                />
+                <Typography
+                  variant="h6"
+                  color={isDarkTheme ? "#FFFFFF" : undefined}
+                >
+                  Processing burn transaction...
+                </Typography>
+              </Box>
+            ) : (
+              <Typography color={isDarkTheme ? "#FFFFFF" : undefined}>
+                Are you sure you want to burn this token? This action cannot be
+                undone. Please be sure to delist your NFT before burning.
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          {!isBurnLoading && (
+            <>
+              <Button
+                onClick={() => setIsBurnModalOpen(false)}
+                variant={isDarkTheme ? "outlined" : "contained"}
+                sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleBurnToken}
+                variant={isDarkTheme ? "outlined" : "contained"}
+                sx={{
+                  color: isDarkTheme ? "#FFFFFF" : undefined,
+                  backgroundColor: isDarkTheme
+                    ? "rgba(220, 38, 38, 0.1)"
+                    : "#dc2626",
+                  "&:hover": {
+                    backgroundColor: isDarkTheme
+                      ? "rgba(220, 38, 38, 0.2)"
+                      : "#b91c1c",
+                  },
+                }}
+              >
+                Burn Token
+              </Button>
+            </>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={!!successTxId}
+        onClose={() => setSuccessTxId(null)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            backgroundColor: isDarkTheme
+              ? "rgba(30, 30, 30, 0.95)"
+              : "rgba(255, 255, 255, 0.95)",
+            backdropFilter: "blur(10px)",
+            borderRadius: "16px",
+          },
+        }}
+      >
+        <DialogTitle>
+          <Typography variant="h6" color={isDarkTheme ? "#FFFFFF" : undefined}>
+            Token Successfully Burned
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ py: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+            <Typography color={isDarkTheme ? "#FFFFFF" : undefined}>
+              The token has been successfully burned. View the transaction
+              details below:
+            </Typography>
+            <Link
+              href={`https://block.voi.network/explorer/transaction/${successTxId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{
+                color: isDarkTheme ? "#90caf9" : "#1976d2",
+                textDecoration: "none",
+                "&:hover": {
+                  textDecoration: "underline",
+                },
+              }}
+            >
+              View Transaction on Explorer
+            </Link>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setSuccessTxId(null)}
+            variant={isDarkTheme ? "outlined" : "contained"}
+            sx={{ color: isDarkTheme ? "#FFFFFF" : undefined }}
           >
             Close
           </Button>

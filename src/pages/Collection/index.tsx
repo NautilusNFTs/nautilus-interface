@@ -38,7 +38,6 @@ import CartNftCard from "../../components/CartNFTCard";
 import { ARC72_INDEXER_API, HIGHFORGE_API } from "../../config/arc72-idx";
 import { stripTrailingZeroBytes } from "@/utils/string";
 import { useWallet } from "@txnlab/use-wallet-react";
-import MintModal from "@/components/modals/MintModal";
 import { stakingRewards } from "@/static/staking/staking";
 import LayersIcon from "@mui/icons-material/Layers";
 import {
@@ -745,9 +744,7 @@ export const Collection: React.FC = () => {
     }
   }, [sortedListings, search, min, max, currency, collection]);
 
-  const [viewMode, setViewMode] = React.useState<"grid" | "list">(
-    id === "421076" ? "list" : "grid"
-  );
+  const [viewMode, setViewMode] = React.useState<"grid" | "list">("grid");
 
   // const stats: any = useMemo(() => {
   //   if (
@@ -1314,53 +1311,6 @@ export const Collection: React.FC = () => {
             <DialogSearch>{renderSidebar}</DialogSearch>
           </div>*/}
           <ListingContainer>
-            {id === "421076" ? (
-              <Stack direction="row" spacing={2} sx={{ justifyContent: "end" }}>
-                {/*<div className="hidden lg:block">
-                  <DialogSearch>{renderSidebar}</DialogSearch>
-                </div>*/}
-                <Button
-                  size="large"
-                  variant="text"
-                  color="primary"
-                  onClick={() => {
-                    window.open("https://staking.voi.network/", "_blank");
-                  }}
-                >
-                  Stake
-                  <NorthEastIcon />
-                </Button>
-                {accounts.length > 0 && id === "421076" ? (
-                  <Button
-                    size="large"
-                    variant="outlined"
-                    color="primary"
-                    onClick={() => {
-                      setIsMintModalVisible(true);
-                    }}
-                  >
-                    <TollIcon />
-                    Mint
-                  </Button>
-                ) : null}
-                <ToggleButtonGroup
-                  color="primary"
-                  value={viewMode}
-                  exclusive
-                  onChange={() => {
-                    setViewMode(viewMode === "list" ? "grid" : "list");
-                  }}
-                  aria-label="Platform"
-                >
-                  <ToggleButton value="list">
-                    <ViewListIcon />
-                  </ToggleButton>
-                  <ToggleButton value="grid">
-                    <GridViewIcon />
-                  </ToggleButton>
-                </ToggleButtonGroup>
-              </Stack>
-            ) : null}
             {viewMode === "list" ? (
               <Box sx={{ mt: 3 }}>
                 <NFTListingTable
@@ -1668,18 +1618,6 @@ export const Collection: React.FC = () => {
           )}
         </Layout>
       )}
-      {id === "421076" ? (
-        <MintModal
-          collectionId={Number(id)}
-          title="Mint Nautilus Voi Staking NFT"
-          handleClose={() => {
-            setIsMintModalVisible(false);
-          }}
-          open={isMintModalVisible}
-          accounts={accounts}
-          buttonText="Mint"
-        />
-      ) : null}
     </>
   );
 };
