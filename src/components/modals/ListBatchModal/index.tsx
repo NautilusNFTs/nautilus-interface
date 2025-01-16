@@ -220,7 +220,7 @@ const ListBatchModal: React.FC<ListBatchModalProps> = ({
               </Box>*/}
               {nfts.length === 1 && [421076].includes(nfts[0].contractId) ? (
                 <Box>
-                  <StakingInformation contractId={nfts[0].tokenId} />
+                  <StakingInformation contractId={Number(nfts[0].tokenId)} />
                 </Box>
               ) : null}
               {nfts.length > 1 ? (
@@ -258,34 +258,12 @@ const ListBatchModal: React.FC<ListBatchModalProps> = ({
                   symbol="VOI"
                 />
               )}
-              {nfts?.some((el) => el.contractId === 421076) ? (
-                <Box>
-                  <Typography variant="caption">
-                    Nautilus Voi Staking NFTs cannet be listed for sale until
-                    after Oct 28th 2024. Feel free to{" "}
-                    <a
-                      style={{ textDecoration: "underline" }}
-                      href="https://nautilus.sh/#/collection/421076/"
-                      target="_blank"
-                    >
-                      mint Nautilus Locked Voi
-                    </a>{" "}
-                    or participate in the{" "}
-                    <a
-                      style={{ textDecoration: "underline" }}
-                      target="_blank"
-                      href="http://staking.voi.network"
-                    >
-                      staking program
-                    </a>
-                    .
-                  </Typography>
-                </Box>
-              ) : null}
+             
               {showDefaultButton ? (
                 <Button
                   disabled={
-                    nfts?.some((el) => el.contractId === 421076) || loading
+                    //nfts?.some((el) => el.contractId === 421076) ||
+                    loading
                   }
                   size="large"
                   fullWidth

@@ -27,6 +27,14 @@ export const routes = [
   },
   */
   {
+    path: "/create-arc200",
+    Component: Page.CreateARC200,
+  },
+  {
+    path: "/staking",
+    Component: Page.Staking,
+  },
+  {
     path: "/listing",
     Component: Page.Listings,
   },

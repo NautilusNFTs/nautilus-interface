@@ -15,7 +15,13 @@ import {
   WalletId,
   WalletManager,
   WalletProvider,
+  useWallet,
 } from "@txnlab/use-wallet-react";
+import Wallet from "./pages/Wallet";
+import { ThemeProvider } from "@mui/material/styles";
+import CssBaseline from "@mui/material/CssBaseline";
+import { theme } from "./theme";
+import CommunityChest from "./pages/CommunityChest";
 
 const BackgroundLayer = styled.div`
   width: 100%;
@@ -51,12 +57,44 @@ const AppContainer: React.FC<AppContainerProps> = ({ children }) => {
   );
 };
 
+// New component that uses the wallet hook
+const AppRoutes: React.FC = () => {
+  const { activeAccount } = useWallet();
+  const isDarkTheme = useSelector(
+    (state: RootState) => state.theme.isDarkTheme
+  );
+
+  return (
+    <AppContainer>
+      <Router>
+        <Navbar />
+        <Routes>
+          {routes.map((el, key) => (
+            <Route key={key} path={el.path} Component={el.Component} />
+          ))}
+          <Route path="/wallet/:accountId" element={<Wallet />} />
+          <Route
+            path="/community-chest"
+            element={
+              <CommunityChest
+                isDarkTheme={isDarkTheme}
+                connected={true} //!!activeAccount}
+                address={activeAccount?.address}
+              />
+            }
+          />
+        </Routes>
+      </Router>
+    </AppContainer>
+  );
+};
+
 const queryClient = new QueryClient();
 
 const App: React.FC = () => {
   const { ALGO_SERVER, ALGO_INDEXER_SERVER } = getCurrentNodeEnv();
 
-  let walletConnectProjectId; // = import.meta.env.VITE_WALLET_CONNECT_PROJECT_ID;
+  let walletConnectProjectId;
   if (!walletConnectProjectId) {
     walletConnectProjectId = "cd7fe0125d88d239da79fa286e6de2a8";
   }
@@ -104,25 +142,19 @@ const App: React.FC = () => {
   });
 
   return (
-    <WalletProvider manager={walletManager}>
-      <QueryClientProvider client={queryClient}>
-        <Provider store={store}>
-          <PersistGate loading={null} persistor={persistor}>
-            <AppContainer>
-              <Router>
-                <Navbar />
-                <Routes>
-                  {routes.map((el, key) => (
-                    <Route key={key} path={el.path} Component={el.Component} />
-                  ))}
-                </Routes>
-              </Router>
-            </AppContainer>
-          </PersistGate>
-        </Provider>
-        <ToastContainer />
-      </QueryClientProvider>
-    </WalletProvider>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <WalletProvider manager={walletManager}>
+        <QueryClientProvider client={queryClient}>
+          <Provider store={store}>
+            <PersistGate loading={null} persistor={persistor}>
+              <AppRoutes />
+            </PersistGate>
+          </Provider>
+          <ToastContainer />
+        </QueryClientProvider>
+      </WalletProvider>
+    </ThemeProvider>
   );
 };
 

@@ -25,10 +25,16 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { useWallet } from "@txnlab/use-wallet-react";
 import StakingInformation from "@/components/StakingInformation/StakingInformation";
+import styled from "styled-components";
+import { getPaymentTokens, simulateTokenToVoi } from "@/utils/dex";
+import { PaymentToken } from "@/types";
+import CurrencySelect from "@/components/CurrencySelect";
+import { simulatePayment } from "@/utils/dex";
+import { useBalances } from "@/hooks/useBalance";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
-export const multiplier = 1.02;
+export const multiplier = 1.01;
 
 interface BuySaleModalProps {
   token: ListingTokenI | NFTIndexerTokenI;
@@ -36,7 +42,11 @@ interface BuySaleModalProps {
   open: boolean;
   loading: boolean;
   handleClose: () => void;
-  onSave: (pool?: any, discount?: any) => Promise<void>;
+  onSave: (
+    pool?: any,
+    discount?: any,
+    simulationResults?: any
+  ) => Promise<void>;
   title?: string;
   buttonText?: string;
   image: string;
@@ -47,7 +57,46 @@ interface BuySaleModalProps {
   paymentTokenId?: number;
   paymentAltTokenId?: string;
   seller?: string;
+  availablePaymentTokens?: PaymentToken[];
 }
+
+const StyledDialog = styled(Modal)<{ isDark?: boolean }>`
+  .MuiPaper-root {
+    background-color: ${(props) => (props.isDark ? "#202020" : "#fff")};
+    color: ${(props) => (props.isDark ? "#fff" : "#161717")};
+    border: 1px solid ${(props) => (props.isDark ? "#3b3b3b" : "#eaebf0")};
+  }
+
+  .MuiDialogTitle-root {
+    color: ${(props) => (props.isDark ? "#fff" : "#161717")};
+  }
+
+  .MuiDialogContent-root {
+    color: ${(props) => (props.isDark ? "#fff" : "#161717")};
+  }
+
+  .MuiDialogActions-root {
+    border-top: 1px solid ${(props) => (props.isDark ? "#3b3b3b" : "#eaebf0")};
+  }
+
+  .MuiButton-root {
+    color: ${(props) => (props.isDark ? "#fff" : "#161717")};
+    border-color: ${(props) => (props.isDark ? "#3b3b3b" : "#eaebf0")};
+
+    &:hover {
+      background-color: ${(props) =>
+        props.isDark ? "#2b2b2b" : "rgba(0, 0, 0, 0.04)"};
+    }
+  }
+`;
+
+const VOI_TOKEN: PaymentToken = {
+  tokenId: 390001,
+  symbol: "VOI",
+  name: "VOI",
+  decimals: 6,
+  price: "1",
+};
 
 const BuySaleModal: React.FC<BuySaleModalProps> = ({
   token,
@@ -61,188 +110,60 @@ const BuySaleModal: React.FC<BuySaleModalProps> = ({
   price,
   priceNormal,
   currency,
-  title = "Enter Address",
   buttonText = "Send",
   priceAU = "0",
   paymentTokenId = 0,
   paymentAltTokenId = "0",
+  availablePaymentTokens = [],
 }) => {
-  const smartTokens = useSelector((state: any) => state.smartTokens.tokens);
-  const smartTokenStatus = useSelector(
-    (state: any) => state.smartTokens.status
-  );
-
-  const [highestSale, setHighestSale] = useState<number>(0);
-  useEffect(() => {
-    axios
-      .get(
-        `https://mainnet-idx.nautilus.sh/nft-indexer/v1/mp/sales?collectionId=${listing.collectionId}&tokenId=${listing.tokenId}`
-      )
-      .then(({ data }) => {
-        console.log({ data });
-        const highestSale = data.sales
-          .map((sale: any) => {
-            const smartToken = smartTokens.find(
-              (token: TokenType) => `${token.contractId}` === `${sale.currency}`
-            );
-            console.log({ smartToken });
-            const unitPriceStr =
-              sale.currency === 0 ? "1" : smartToken?.price || "0";
-            const decimals =
-              sale.currency === 0 ? 6 : smartToken?.decimals || 6;
-            const unitPriceBn = new BigNumber(unitPriceStr);
-            const tokenPriceBn = new BigNumber(sale?.price).div(
-              new BigNumber(10).pow(decimals)
-            );
-            const normalPrice = unitPriceBn
-              .multipliedBy(tokenPriceBn)
-              .toNumber();
-            return normalPrice;
-          })
-          .reduce((acc: any, val: any) => Math.max(acc, val), 0);
-        setHighestSale(highestSale);
-      });
-  }, [smartTokens]);
-
-  const [currencyPrice, setCurrencyPrice] = useState<number>(0);
-  const [poolPrice, setPoolPrice] = useState<number>(0);
-  const [pool, setPool] = useState<any>();
-  useEffect(() => {
-    if (currency === "VOI") return;
-    axios
-      .get(
-        `https://mainnet-idx.nautilus.sh/nft-indexer/v1/dex/pools?tokenId=${paymentTokenId}`
-      )
-      .then(({ data }) => {
-        const pool = data.pools
-          .filter(
-            (pool: any) =>
-              pool.providerId === "01" && pool.poolId.match(/(-0$)|(^0-)/)
-          )
-          .reduce(
-            (acc: any, val: any) => {
-              if (acc.mintRound < val.mintRound) {
-                return acc;
-              }
-              return val;
-            },
-            { mintRound: Number.MAX_SAFE_INTEGER }
-          );
-        const priceSUBn = new BigNumber(priceAU).div(
-          new BigNumber(10).pow(
-            smartTokens.find(
-              (token: TokenType) =>
-                `${token.contractId}` === `${paymentTokenId}`
-            )?.decimals || 0
-          )
-        );
-        const { tokAId, poolBalA, poolBalB } = pool;
-        if (tokAId === `${paymentTokenId}`) {
-          const currencyPrice = new BigNumber(poolBalB).div(
-            new BigNumber(poolBalA)
-          );
-          setPoolPrice(priceSUBn.multipliedBy(currencyPrice).toNumber());
-          setCurrencyPrice(currencyPrice.toNumber());
-        } else {
-          const currencyPrice = new BigNumber(poolBalA).div(
-            new BigNumber(poolBalB)
-          );
-          setPoolPrice(priceSUBn.multipliedBy(currencyPrice).toNumber());
-          setCurrencyPrice(currencyPrice.toNumber());
-        }
-        setPool(pool);
-      });
-  }, []);
-
+  const isDarkTheme = useSelector((state: any) => state.theme.isDarkTheme);
   const { activeAccount, signTransactions } = useWallet();
-  const [netBalance, setNetBalance] = useState("0");
-  useEffect(() => {
-    if (!activeAccount || paymentAltTokenId !== "0" || !open) return;
-    const { algodClient } = getAlgorandClients();
-    algodClient
-      .accountInformation(activeAccount.address)
-      .do()
-      .then((res: any) => {
-        setNetBalance(res.amount.toString());
-      });
-  }, [activeAccount, open]);
 
-  const [balance, setBalance] = useState("0");
-  useEffect(() => {
-    if (!activeAccount || !open) return;
-    const { algodClient, indexerClient } = getAlgorandClients();
-    new arc200(Number(paymentTokenId), algodClient, indexerClient)
-      .arc200_balanceOf(activeAccount.address)
-      .then((res: any) => {
-        if (res.success) {
-          setBalance(res.returnValue.toString());
-        }
-      });
-  }, [activeAccount, open]);
-  const displayBalance = useMemo(() => {
-    const smartToken = smartTokens.find(
-      (token: TokenType) => `${token.contractId}` === `${paymentTokenId}`
-    );
-    if (paymentTokenId === 0) {
-      return new BigNumber(netBalance).div(new BigNumber(10).pow(6)).toFixed(6);
-    } else if (smartToken) {
-      const decimals = smartToken?.decimals;
-      return smartToken?.tokenId === "0"
-        ? new BigNumber(balance)
-            .plus(new BigNumber(netBalance))
-            .div(new BigNumber(10).pow(decimals))
-            .toFixed(Math.min(decimals, 6))
-        : new BigNumber(balance)
-            .div(new BigNumber(10).pow(decimals))
-            .toFixed(Math.min(decimals, 6));
-    }
-  }, [balance, netBalance, smartTokens, smartTokenStatus]);
-
-  const discount = useMemo(() => {
-    const smartToken = smartTokens.find(
-      (token: TokenType) => `${token.contractId}` === `${paymentTokenId}`
-    );
-
-    const priceSUB = new BigNumber(priceAU).dividedBy(
-      new BigNumber(10).pow(smartToken?.decimals)
-    );
-
-    return priceSUB
-      .minus(new BigNumber(displayBalance || 0))
-      .multipliedBy(new BigNumber(smartToken?.price || 0))
-      .multipliedBy(multiplier)
-      .toFixed(6);
-  }, [displayBalance]);
-
+  // State declarations
+  const [highestSale, setHighestSale] = useState<number>(0);
   const [manager, setManager] = useState<string>();
-  useEffect(() => {
-    if (!activeAccount) return;
-    const { algodClient, indexerClient } = getAlgorandClients();
-    const ci = new CONTRACT(
-      Number(listing.mpContractId),
-      algodClient,
-      indexerClient,
-      abi.mp,
+  const [tokenMetadata, setTokenMetadata] = useState<{
+    name?: string;
+    unit_name?: string;
+  }>({});
+  const [paymentTokens, setPaymentTokens] = useState<PaymentToken[]>([]);
+  const [selectedPaymentToken, setSelectedPaymentToken] =
+    useState<PaymentToken>(VOI_TOKEN);
+  const [simulationResults, setSimulationResults] = useState<
+    Record<
+      number,
       {
-        addr: activeAccount.address,
-        sk: new Uint8Array(0),
+        outputAmount: string;
+        priceImpact: string;
       }
-    );
-    ci.manager().then((res: any) => {
-      if (res.success) {
-        setManager(res.returnValue);
-      }
-    });
-  }, [activeAccount]);
+    >
+  >({});
 
+  console.log({ simulationResults });
+
+  // Hooks
+  const balances = useBalances(activeAccount?.address);
+
+  // Memoized values
   const canBuy = useMemo(() => {
-    return new BigNumber(balance)
-      .plus(new BigNumber(netBalance))
-      .gte(new BigNumber(priceAU));
-  }, [balance, netBalance]);
+    if (!selectedPaymentToken) return false;
 
-  const handleSave = async (pool: any, discount: any) => {
-    await onSave(pool, discount);
+    const balance =
+      balances[selectedPaymentToken.tokenId.toString()]?.balance || "0";
+    const requiredAmount =
+      selectedPaymentToken.tokenId === VOI_TOKEN.tokenId
+        ? priceAU
+        : simulationResults[selectedPaymentToken.tokenId]?.outputAmount || "0";
+
+    return new BigNumber(balance).gte(new BigNumber(requiredAmount));
+  }, [selectedPaymentToken, balances, priceAU, simulationResults]);
+
+  const handleSave = async (
+    pool: any,
+    discount: any,
+    simulationResults: any
+  ) => {
+    await onSave(pool, discount, simulationResults);
     handleClose();
   };
 
@@ -283,10 +204,91 @@ const BuySaleModal: React.FC<BuySaleModalProps> = ({
       ? image
       : `https://ipfs.io/ipfs/${image.slice(7)}`;
 
+  // Update payment tokens initialization
+  useEffect(() => {
+    const fetchTokens = async () => {
+      if (open) {
+        try {
+          const tokens = await getPaymentTokens();
+          console.log("Available payment tokens:", tokens); // Debug log
+          setPaymentTokens(tokens);
+          // Initialize with VOI if not already set
+          if (!selectedPaymentToken) {
+            setSelectedPaymentToken(tokens[0]); // VOI is always first
+          }
+        } catch (error) {
+          console.error("Error fetching payment tokens:", error);
+          // Fallback to VOI only
+          setPaymentTokens([VOI_TOKEN]);
+          setSelectedPaymentToken(VOI_TOKEN);
+        }
+      }
+    };
+
+    fetchTokens();
+  }, [open]); // Only depend on open state
+
+  // Add useEffect to fetch token metadata
+  useEffect(() => {
+    const fetchTokenMetadata = async () => {
+      try {
+        const { data } = await axios.get(
+          `https://mainnet-idx.nautilus.sh/nft-indexer/v1/tokens?contractId=${token.contractId}&tokenId=${token.tokenId}`
+        );
+        if (data.tokens?.[0]?.metadata) {
+          setTokenMetadata(data.tokens[0].metadata);
+        }
+      } catch (error) {
+        console.error("Error fetching token metadata:", error);
+      }
+    };
+    if (token.contractId && token.tokenId) {
+      fetchTokenMetadata();
+    }
+  }, [token.contractId, token.tokenId]);
+
+  // Add effect to simulate swaps
+  useEffect(() => {
+    const simulateSwaps = async () => {
+      if (!priceAU) return;
+
+      const results: Record<
+        number,
+        { outputAmount: string; priceImpact: string }
+      > = {};
+
+      for (const token of paymentTokens) {
+        if (token.tokenId === VOI_TOKEN.tokenId || !token.pool) continue;
+
+        try {
+          const result = await simulateTokenToVoi(
+            priceAU,
+            token.pool,
+            activeAccount?.address
+          );
+
+          results[token.tokenId] = result;
+        } catch (error) {
+          console.error(
+            `Error simulating swap for token ${token.tokenId}:`,
+            error
+          );
+        }
+      }
+
+      setSimulationResults(results);
+    };
+
+    simulateSwaps();
+  }, [paymentTokens, priceAU, activeAccount?.address]);
+
+  console.log({ listing });
+
   return (
-    <Modal
+    <StyledDialog
       open={open}
       onClose={handleClose}
+      isDark={isDarkTheme}
       aria-labelledby="address-modal-title"
       aria-describedby="address-modal-description"
     >
@@ -296,15 +298,23 @@ const BuySaleModal: React.FC<BuySaleModalProps> = ({
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -50%)",
-          background: "white",
+          background: isDarkTheme ? "#202020" : "white",
+          color: isDarkTheme ? "#fff" : "#161717",
           padding: "40px",
-          minHeight: "300px",
-          minWidth: "400px",
-          width: "50vw",
+          maxHeight: "90vh",
+          minWidth: "300px",
+          width: "90vw",
+          maxWidth: "800px",
           borderRadius: "25px",
+          border: `1px solid ${isDarkTheme ? "#3b3b3b" : "#eaebf0"}`,
+          overflowY: "auto",
+          msOverflowStyle: "none",
+          scrollbarWidth: "none",
+          "&::-webkit-scrollbar": {
+            display: "none",
+          },
         }}
       >
-        <h2 id="address-modal-title">{title}</h2>
         {!loading ? (
           <>
             <Grid container spacing={2}>
@@ -315,12 +325,19 @@ const BuySaleModal: React.FC<BuySaleModalProps> = ({
                   style={{ width: "100%", borderRadius: "25px" }}
                 />
               </Grid>
+
               <Grid item xs={12} sm={6}>
-                <Box
-                  sx={{
-                    p: 1,
-                  }}
-                >
+                <Box sx={{ p: 1 }}>
+                  <InputLabel htmlFor="name">Name</InputLabel>
+                  <Typography variant="h5" gutterBottom>
+                    {tokenMetadata.name?.includes(".voi")
+                      ? tokenMetadata.name
+                      : tokenMetadata.name ||
+                        tokenMetadata.unit_name ||
+                        `Token #${token.tokenId}`}
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 1 }}>
                   <InputLabel htmlFor="price">Price</InputLabel>
                   <Typography variant="h5" gutterBottom>
                     <Stack
@@ -332,112 +349,90 @@ const BuySaleModal: React.FC<BuySaleModalProps> = ({
                     </Stack>
                   </Typography>
                 </Box>
-                <Box
-                  sx={{
-                    p: 1,
-                  }}
-                >
+                <Box sx={{ p: 1 }}>
                   <InputLabel htmlFor="balance">Seller</InputLabel>
                   <Typography variant="h5" gutterBottom>
                     {seller?.slice(0, 4)}...{seller?.slice(-4)}
                   </Typography>
                 </Box>
-
-                {currency !== "VOI" ? (
-                  <Box
-                    sx={{
-                      p: 1,
-                    }}
-                  >
+                {currency !== "VOI" && (
+                  <Box sx={{ p: 1 }}>
                     <InputLabel htmlFor="balance">VOI Balance</InputLabel>
                     <Typography variant="h5" gutterBottom>
-                      {new BigNumber(netBalance)
+                      {new BigNumber(balances["voi"]?.balance || "0")
                         .div(new BigNumber(10).pow(6))
                         .toFixed(6)}
                     </Typography>
                   </Box>
-                ) : null}
-                <Box
-                  sx={{
-                    p: 1,
-                  }}
-                >
-                  <InputLabel htmlFor="balance">{currency} Balance</InputLabel>
-                  <Typography variant="h5" gutterBottom>
-                    {displayBalance}
-                  </Typography>
-                </Box>
-                {poolPrice > 0 ? (
-                  <Box
-                    sx={{
-                      p: 1,
-                    }}
-                  >
-                    <InputLabel htmlFor="balance">{currency} Price</InputLabel>
-                    <Typography variant="h5" gutterBottom>
-                      {Number(currencyPrice).toFixed(6)} VOI
-                    </Typography>
-                  </Box>
-                ) : null}
-                {highestSale > 0 ? (
-                  <Box
-                    sx={{
-                      p: 1,
-                    }}
-                  >
+                )}
+                {highestSale > 0 && (
+                  <Box sx={{ p: 1 }}>
                     <InputLabel htmlFor="balance">Highest Sale</InputLabel>
                     <Typography variant="h5" gutterBottom>
                       {formatter.format(highestSale)} VOI
                     </Typography>
                   </Box>
-                ) : null}
+                )}
               </Grid>
-              {[421076].includes(Number(token.contractId)) ? (
+
+              {[421076].includes(Number(token.contractId)) && (
                 <Grid item xs={12}>
                   <StakingInformation contractId={Number(token.tokenId)} />
                 </Grid>
-              ) : null}
+              )}
+
               <Grid item xs={12}>
-                <Stack sx={{ mt: 3 }} gap={2}>
-                  {pool?.contractId ? (
-                    <Button
-                      color="secondary"
-                      size="large"
-                      fullWidth
-                      variant="contained"
-                      onClick={() => {
-                        handleSave(pool, 0);
-                      }}
-                    >
-                      Buy {(Number(poolPrice) * multiplier).toFixed(6)} VOI
-                    </Button>
-                  ) : null}
-                  <Button
-                    disabled={!canBuy}
-                    size="large"
-                    fullWidth
-                    variant="contained"
-                    onClick={() => handleSave(undefined, 0)}
-                  >
-                    Buy {price} {currency}
-                  </Button>
-                  {false && pool && Number(discount) > 0 ? (
-                    <Button
-                      disabled={Number(discount) > Number(netBalance) / 10 ** 6}
-                      size="large"
-                      fullWidth
-                      variant="contained"
-                      onClick={() =>
-                        handleSave(
-                          pool,
-                          new BigNumber(displayBalance || 0).toNumber()
-                        )
+                <Box sx={{ mb: 2 }}>
+                  <CurrencySelect
+                    value={selectedPaymentToken?.tokenId || VOI_TOKEN.tokenId}
+                    onChange={(tokenId) => {
+                      const token = paymentTokens.find(
+                        (t) => t.tokenId === tokenId
+                      );
+                      if (token) {
+                        setSelectedPaymentToken(token);
                       }
-                    >
-                      Buy {discount} VOI + {displayBalance} {currency}
-                    </Button>
-                  ) : null}
-                  {activeAccount?.address === manager ? (
+                    }}
+                    tokens={paymentTokens}
+                    balances={balances}
+                    price={priceAU}
+                    simulationResults={simulationResults}
+                    onBuy={(token) => {
+                      if (token.tokenId === VOI_TOKEN.tokenId) {
+                        handleSave(undefined, 0, simulationResults);
+                      } else {
+                        handleSave(token.pool, 0, simulationResults);
+                      }
+                    }}
+                    canBuy={(tokenId) => {
+                      console.log({
+                        tokenId,
+                        paymentTokens,
+                        balances,
+                        simulationResults,
+                      });
+                      const token = paymentTokens.find(
+                        (t) => t.tokenId === tokenId
+                      );
+                      if (!token) return false;
+
+                      const balance =
+                        balances[token.tokenId.toString()]?.balance || "0";
+                      const requiredAmount =
+                        token.tokenId === VOI_TOKEN.tokenId
+                          ? priceAU
+                          : simulationResults[token.tokenId]?.outputAmount ||
+                            "0";
+
+                      return new BigNumber(balance).gte(
+                        new BigNumber(requiredAmount)
+                      );
+                    }}
+                  />
+                </Box>
+
+                <Stack sx={{ mt: 3 }} gap={2}>
+                  {activeAccount?.address === manager && (
                     <Button
                       size="large"
                       fullWidth
@@ -447,7 +442,7 @@ const BuySaleModal: React.FC<BuySaleModalProps> = ({
                     >
                       Delete
                     </Button>
-                  ) : null}
+                  )}
                   <Button
                     size="large"
                     fullWidth
@@ -474,7 +469,7 @@ const BuySaleModal: React.FC<BuySaleModalProps> = ({
           </div>
         )}
       </div>
-    </Modal>
+    </StyledDialog>
   );
 };
 

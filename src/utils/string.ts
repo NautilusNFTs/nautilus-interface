@@ -29,3 +29,9 @@ export const stripTrailingZeroBytes = (str: string) => {
     return str;
   }
 };
+
+export function stringToUint8Array(str: string, length: number): Uint8Array {
+  const bytes = new Uint8Array(length);
+  bytes.set(new Uint8Array(Buffer.from(str, "utf8")), 0);
+  return bytes;
+}

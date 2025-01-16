@@ -376,9 +376,7 @@ const MintModal: React.FC<MintModalProps> = ({
                           <TableRow>
                             <TableCell>Total Tokens</TableCell>
                             <TableCell align="right">
-                              {el.global_period > 5
-                                ? formatter.format(el.global_total)
-                                : formatter.format(el.global_total)}{" "}
+                              {formatter.format(el.global_initial / 10 ** 6)}{" "}
                               VOI
                             </TableCell>
                           </TableRow>
@@ -565,10 +563,7 @@ const MintModal: React.FC<MintModalProps> = ({
                           <TableRow>
                             <TableCell>Total Tokens</TableCell>
                             <TableCell align="right">
-                              {el.global_period > 5
-                                ? formatter.format(el.global_total)
-                                : formatter.format(el.global_total)}{" "}
-                              VOI
+                              {formatter.format(el.global_total / 10 ** 6)} VOI
                             </TableCell>
                           </TableRow>
                           {/*

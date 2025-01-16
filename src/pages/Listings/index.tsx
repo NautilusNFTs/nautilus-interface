@@ -12,6 +12,13 @@ import {
   Grid,
   Skeleton,
   Unstable_Grid2,
+  FormControl,
+  MenuItem,
+  Select,
+  SelectChangeEvent,
+  Autocomplete,
+  TextField,
+  Chip,
 } from "@mui/material";
 import { Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -56,7 +63,6 @@ import CartNftCard from "../../components/CartNFTCard";
 import Grid2 from "@mui/material/Unstable_Grid2/Grid2";
 import LazyLoad from "react-lazy-load";
 import TokenSelect from "../../components/TokenSelect";
-import CollectionSelect from "../../components/CollectionSelect";
 import LayersIcon from "@mui/icons-material/Layers";
 import {
   useListings,
@@ -70,6 +76,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { stripTrailingZeroBytes } from "@/utils/string";
+import { GridView, List } from "@mui/icons-material";
+import { ToggleButton, ToggleButtonGroup } from "@mui/material";
+import InfiniteScroll from "react-infinite-scroll-component";
+import { setTimeFilter } from "../../store/userSlice";
+import { useQuery } from "@tanstack/react-query";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -238,19 +249,26 @@ const ListingRoot = styled.div`
   align-items: flex-start;
   gap: var(--Main-System-20px, 20px);
   margin-top: 44px;
+  min-height: 100vh;
+  position: relative;
 `;
 
 const SidebarFilterRoot = styled(Stack)`
   display: flex;
   width: 270px;
   padding: var(--Main-System-24px, 24px);
-  /*
-  flex-direction: column;
-  align-items: flex-start;
-  */
   gap: var(--Main-System-24px, 24px);
   border-radius: var(--Main-System-10px, 10px);
   flex-shrink: 0;
+  position: sticky;
+  top: 88px;
+  height: fit-content;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  align-self: flex-start;
+  flex-direction: column;
+  justify-content: space-between;
+
   &.dark {
     border: 1px solid #2b2b2b;
     background: #202020;
@@ -259,21 +277,43 @@ const SidebarFilterRoot = styled(Stack)`
     border: 1px solid #eaebf0;
     background: var(--Background-Base-Main, #fff);
   }
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: ${(props) => (props.theme.isDarkTheme ? "#3b3b3b" : "#eaebf0")};
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: ${(props) => (props.theme.isDarkTheme ? "#4b4b4b" : "#d0d0d0")};
+  }
 `;
 
-const ListingContainer = styled.div`
+const ListingContainer = styled.div<{ viewMode?: "grid" | "list" }>`
   padding-top: 16px;
+  padding-left: ${(props) => (props.viewMode === "list" ? "24px" : "16px")};
+  padding-right: ${(props) => (props.viewMode === "list" ? "24px" : "16px")};
+  padding-bottom: 16px;
   overflow: hidden;
   flex-grow: 1;
+
+  // Add margin to InfiniteScroll container to prevent hover cutoff
+  & > div {
+    margin: ${(props) => (props.viewMode === "list" ? "8px 0" : "8px")};
+  }
 `;
 
 const ListingHeading = styled.div`
   display: flex;
-  /*
-  width: 955px;
-  */
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
 `;
 
 const HeadingContainer = styled.div`
@@ -457,23 +497,62 @@ function shuffleArray<T>(array: T[]): T[] {
 
 //const CartNFTCard = lazy(() => import("../../components/CartNFTCard"));
 
-export const Listings: React.FC = () => {
-  /* Dispatch */
-  // const dispatch = useDispatch();
-  /* Listings */
-  const { data: listings, status: listingsStatus } = useListings();
+interface CollectionData {
+  contractId: number;
+  totalSupply: number;
+  creator: string;
+  globalState: Array<{
+    key: string;
+    value: any;
+  }>;
+  mintRound: number;
+  burnedSupply: number;
+  firstToken: any;
+}
 
-  // const listings = useSelector((state: any) => state.listings.listings);
-  // const listingsStatus = useSelector((state: any) => state.listings.status);
-  // useEffect(() => {
-  //   dispatch(getListings() as unknown as UnknownAction);
-  // }, [dispatch]);
-  /* Dex */
-  // const prices = useSelector((state: RootState) => state.dex.prices);
-  // const dexStatus = useSelector((state: RootState) => state.dex.status);
-  // useEffect(() => {
-  //   dispatch(getPrices() as unknown as UnknownAction);
-  // }, [dispatch]);
+const useCollections = () => {
+  return useQuery({
+    queryKey: ["collections"],
+    queryFn: async () => {
+      const { data } = await axios.get(
+        "https://mainnet-idx.nautilus.sh/nft-indexer/v1/collections"
+      );
+      return data.collections as CollectionData[];
+    },
+    staleTime: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+    cacheTime: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+};
+
+// Add this helper function near the top of the file
+const getCollectionName = (collection: CollectionData) => {
+  try {
+    if (!collection.firstToken?.metadata) return `#${collection.contractId}`;
+    const metadata = JSON.parse(collection.firstToken.metadata);
+    // Try to get collection name from standard metadata fields
+    const name =
+      metadata.collection_name ||
+      metadata.collectionName ||
+      metadata.collection ||
+      metadata.name;
+    if (!name) return `#${collection.contractId}`;
+
+    // Remove trailing numbers with optional # prefix
+    const cleanedName = name.replace(/[#\s]*\d+$/, "").trim();
+    return cleanedName || `#${collection.contractId}`;
+  } catch (e) {
+    return `#${collection.contractId}`;
+  }
+};
+
+export const Listings: React.FC = () => {
+  const dispatch = useDispatch();
+  const timeFilter = useSelector((state: RootState) => state.user.timeFilter);
+
+  const { data: listings, status: listingsStatus } = useListings();
 
   const exchangeRate = useMemo(() => {
     return 1;
@@ -484,52 +563,14 @@ export const Listings: React.FC = () => {
     // }, [prices, dexStatus]);
   }, []);
 
-  /* Tokens */
-  // const tokens = useSelector((state: any) => state.tokens.tokens);
-  // const tokenStatus = useSelector((state: any) => state.tokens.status);
-  // useEffect(() => {
-  //   dispatch(getTokens() as unknown as UnknownAction);
-  // }, [dispatch]);
-  // console.log({ tokens });
-
-  /* Collections */
-  // const collections = useSelector(
-  //   (state: any) => state.collections.collections
-  // );
-  // const collectionStatus = useSelector(
-  //   (state: any) => state.collections.status
-  // );
-  // useEffect(() => {
-  //   dispatch(getCollections() as unknown as UnknownAction);
-  // }, [dispatch]);
-
-  /* Sales */
-  // const sales = useSelector((state: any) => state.sales.sales);
-  // const salesStatus = useSelector((state: any) => state.sales.status);
-  // useEffect(() => {
-  //   dispatch(getSales() as unknown as UnknownAction);
-  // }, [dispatch]);
-
-  /* Smart Tokens */
   const { status: smartTokenStatus, data: smartTokens } = useSmartTokens();
 
-  // const smartTokens = useSelector((state: any) => state.smartTokens.tokens);
-  // const smartTokenStatus = useSelector(
-  //   (state: any) => state.smartTokens.status
-  // );
-  // useEffect(() => {
-  //   dispatch(getSmartTokens() as unknown as UnknownAction);
-  // }, [dispatch]);
-
-  /* Theme */
   const isDarkTheme = useSelector(
     (state: RootState) => state.theme.isDarkTheme
   );
 
-  /* Router */
   const navigate = useNavigate();
 
-  /* Toggle Buttons */
   const [selectedOption, setSelectedOption] = useState<string | null>("all");
 
   const handleOptionChange = (
@@ -546,44 +587,23 @@ export const Listings: React.FC = () => {
   const [min, setMin] = useState<string>("");
   const [max, setMax] = useState<string>("");
   const [currency, setCurrency] = useState<string>("");
-  const [collection, setCollection] = useState<string>("");
   const [showing, setShowing] = useState(50);
 
   const debouncedSearch = useDebounceCallback(setSearch, 500);
   const debouncedMin = useDebounceCallback(setMin, 500);
   const debouncedMax = useDebounceCallback(setMax, 500);
 
-  // const listCollections = useMemo(() => {
-  //   const collectionIds: number[] = Array.from(
-  //     new Set(listings.map((listing: ListingI) => listing.collectionId))
-  //   );
-  //   const collections: ListingI[] = collectionIds.map(
-  //     (collectionId: number) => {
-  //       const collection = listings.find(
-  //         (l: ListingI) => l.collectionId || 0 === collectionId
-  //       );
-  //       return collection as ListingI;
-  //     }
-  //   );
-  //   return collections;
-  // }, [listings]);
+  const { data: collections, isLoading: collectionsLoading } = useCollections();
+
+  console.log(collections);
 
   const listCollectionIds: number[] = useMemo(() => {
-    return Array.from(
-      new Set(
-        listings?.map((collection: ListingI) => collection.collectionId) ?? []
-      )
-    );
-  }, [listings]);
+    if (!collections) return [];
 
-  // const listTokens = useMemo(() => {
-  //   return listings.map((listing: ListingI) => {
-  //     const { token } = listing;
-  //     return {
-  //       ...token,
-  //     };
-  //   });
-  // }, [listings]);
+    return Array.from(
+      new Set(collections.map((collection) => collection.contractId))
+    );
+  }, [collections]);
 
   const listCurencies: number[] = useMemo(() => {
     const tokenIds = new Set();
@@ -607,6 +627,10 @@ export const Listings: React.FC = () => {
       }) ?? []
     );
   }, [listings, smartTokens]);
+
+  const [selectedCollections, setSelectedCollections] = useState<
+    CollectionData[]
+  >([]);
 
   const filteredListings = useMemo(() => {
     const listings = normalListings.map((listing: ListingI) => {
@@ -648,239 +672,360 @@ export const Listings: React.FC = () => {
         relevancy,
       };
     });
+
+    // Time filtering with fallback logic
+    const now = Date.now();
+    const get24hListings = () => {
+      return listings.filter((listing: any) => {
+        const listingTime = listing.createTimestamp * 1000;
+        return now - listingTime <= 24 * 60 * 60 * 1000;
+      });
+    };
+
+    const get7dListings = () => {
+      return listings.filter((listing: any) => {
+        const listingTime = listing.createTimestamp * 1000;
+        return now - listingTime <= 7 * 24 * 60 * 60 * 1000;
+      });
+    };
+
+    let timeFilteredListings;
+    const currentTimeFilter = timeFilter || "24h";
+
+    if (currentTimeFilter === "24h") {
+      timeFilteredListings = get24hListings();
+      if (timeFilteredListings.length === 0) {
+        timeFilteredListings = get7dListings();
+        if (timeFilteredListings.length === 0) {
+          timeFilteredListings = listings;
+          dispatch(setTimeFilter("all"));
+        } else {
+          dispatch(setTimeFilter("7d"));
+        }
+      }
+    } else if (currentTimeFilter === "7d") {
+      timeFilteredListings = get7dListings();
+      if (timeFilteredListings.length === 0) {
+        timeFilteredListings = listings;
+        dispatch(setTimeFilter("all"));
+      }
+    } else {
+      timeFilteredListings = listings;
+    }
+
     if (search === "") {
-      listings?.sort((a: any, b: any) => b.round - a.round);
-      return listings.filter(
+      timeFilteredListings?.sort(
+        (a: any, b: any) => b.mpListingId - a.mpListingId
+      );
+      return timeFilteredListings.filter(
         (el: any) =>
           (`${currency}` === "" ||
             currency.split(",").map(Number).includes(el.currency)) &&
-          (`${collection}` === "" ||
-            `${collection}` === `${el.collectionId}`) &&
+          (selectedCollections.length === 0 ||
+            selectedCollections.some(
+              (c) => c.contractId === el.collectionId
+            )) &&
           el.price / 1e6 >= (min ? parseInt(min) : 0) &&
           el.price / 1e6 <= (max ? parseInt(max) : Number.MAX_SAFE_INTEGER)
       );
     } else {
-      listings?.sort((a: any, b: any) => b.relevancy - a.relevancy);
-      return listings?.filter(
+      timeFilteredListings?.sort((a: any, b: any) => b.relevancy - a.relevancy);
+      return timeFilteredListings?.filter(
         (el: any) =>
           (`${currency}` === "" ||
             currency.split(",").map(Number).includes(el.currency)) &&
-          (`${collection}` === "" ||
-            `${collection}` === `${el.collectionId}`) &&
+          (selectedCollections.length === 0 ||
+            selectedCollections.some(
+              (c) => c.contractId === el.collectionId
+            )) &&
           el.relevancy > 0 &&
           el.price / 1e6 >= (min ? parseInt(min) : 0) &&
           el.price / 1e6 <= (max ? parseInt(max) : Number.MAX_SAFE_INTEGER)
       );
     }
-  }, [normalListings, search, min, max, currency, collection]);
+  }, [
+    normalListings,
+    search,
+    min,
+    max,
+    currency,
+    selectedCollections,
+    timeFilter,
+    dispatch,
+  ]);
 
-  const isLoading = useMemo(
-    () => !listings || !smartTokens || listingsStatus !== "success",
-    [listings, smartTokens, listingsStatus]
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
+  const [displayedItems, setDisplayedItems] = useState<NFTIndexerListingI[]>(
+    []
   );
+
+  console.log({ displayedItems });
+
+  const [hasMore, setHasMore] = useState(true);
+  const itemsPerLoad = 50;
+
+  const handleTimeFilterChange = (
+    event: SelectChangeEvent<"24h" | "7d" | "all">
+  ) => {
+    dispatch(setTimeFilter(event.target.value as "24h" | "7d" | "all"));
+  };
+
+  const handleViewChange = (
+    event: React.MouseEvent<HTMLElement>,
+    newView: "grid" | "list" | null
+  ) => {
+    if (newView !== null) {
+      setViewMode(newView);
+    }
+  };
 
   const renderSidebar = (
     <SidebarFilterRoot
-      className={`${isDarkTheme ? "dark" : "light"} p-3  md:!block `}
-      // sx={{
-      //   display: { xs: "none", md: "block" },
-      // }}
+      className={`${isDarkTheme ? "dark" : "light"} p-3 md:!block`}
     >
-      <SearchContainer className="">
-        <SearchInput className={isDarkTheme ? "dark" : "light"}>
-          <SearchIcon
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-          >
-            <g clip-path="url(#clip0_1018_4041)">
-              <path
-                d="M14.6673 14.6667L11.6673 11.6667M13.334 7.33333C13.334 10.647 10.6477 13.3333 7.33398 13.3333C4.02028 13.3333 1.33398 10.647 1.33398 7.33333C1.33398 4.01962 4.02028 1.33333 7.33398 1.33333C10.6477 1.33333 13.334 4.01962 13.334 7.33333Z"
-                stroke="#68727D"
-                strokeWidth="1.77778"
-                strokeLinecap="round"
-              />
-            </g>
-            <defs>
-              <clipPath id="clip0_1018_4041">
-                <rect width="16" height="16" fill="white" />
-              </clipPath>
-            </defs>
-          </SearchIcon>
-          <SearchPlaceholderText
-            type="text"
-            className={[
-              search ? "has-value" : "",
-              isDarkTheme ? "dark" : "light",
-            ].join(" ")}
-            placeholder="Search"
-            value={searchValue}
-            onChange={(e) => {
-              if (e.target.value === "") {
-                setSearch("");
-                setSearchValue("");
-              }
-              debouncedSearch(e.target.value);
-              setSearchValue(e.target.value);
-            }}
-          />
-        </SearchInput>
-      </SearchContainer>
-      <SidebarFilterContainer>
-        <SidebarFilter>
-          <Stack
-            direction="row"
-            sx={{
-              justifyContent: "flex-start",
-              width: "100%",
-              gap: "12px",
-            }}
-          >
-            <svg
+      <div className="flex flex-col gap-6">
+        <SearchContainer className="">
+          <SearchInput className={isDarkTheme ? "dark" : "light"}>
+            <SearchIcon
               xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
               fill="none"
             >
-              <path
-                d="M8.5 14.6667C8.5 15.9553 9.54467 17 10.8333 17H13C14.3807 17 15.5 15.8807 15.5 14.5C15.5 13.1193 14.3807 12 13 12H11C9.61929 12 8.5 10.8807 8.5 9.5C8.5 8.11929 9.61929 7 11 7H13.1667C14.4553 7 15.5 8.04467 15.5 9.33333M12 5.5V7M12 17V18.5M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z"
-                stroke={isDarkTheme ? "white" : "black"}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <SidebarLabel className={isDarkTheme ? "dark" : "light"}>
-              Price
-            </SidebarLabel>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
+              <g clip-path="url(#clip0_1018_4041)">
+                <path
+                  d="M14.6673 14.6667L11.6673 11.6667M13.334 7.33333C13.334 10.647 10.6477 13.3333 7.33398 13.3333C4.02028 13.3333 1.33398 10.647 1.33398 7.33333C1.33398 4.01962 4.02028 1.33333 7.33398 1.33333C10.6477 1.33333 13.334 4.01962 13.334 7.33333Z"
+                  stroke="#68727D"
+                  strokeWidth="1.77778"
+                  strokeLinecap="round"
+                />
+              </g>
+              <defs>
+                <clipPath id="clip0_1018_4041">
+                  <rect width="16" height="16" fill="white" />
+                </clipPath>
+              </defs>
+            </SearchIcon>
+            <SearchPlaceholderText
+              type="text"
+              className={[
+                search ? "has-value" : "",
+                isDarkTheme ? "dark" : "light",
+              ].join(" ")}
+              placeholder="Search"
+              value={searchValue}
+              onChange={(e) => {
+                if (e.target.value === "") {
+                  setSearch("");
+                  setSearchValue("");
+                }
+                debouncedSearch(e.target.value);
+                setSearchValue(e.target.value);
+              }}
+            />
+          </SearchInput>
+        </SearchContainer>
+
+        <SidebarFilterContainer>
+          <SidebarFilter>
+            <Stack
+              direction="row"
+              sx={{
+                justifyContent: "flex-start",
+                width: "100%",
+                gap: "12px",
+              }}
             >
-              <path
-                d="M5 12H19"
-                stroke={isDarkTheme ? "white" : "black"}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <path
+                  d="M8.5 14.6667C8.5 15.9553 9.54467 17 10.8333 17H13C14.3807 17 15.5 15.8807 15.5 14.5C15.5 13.1193 14.3807 12 13 12H11C9.61929 12 8.5 10.8807 8.5 9.5C8.5 8.11929 9.61929 7 11 7H13.1667C14.4553 7 15.5 8.04467 15.5 9.33333M12 5.5V7M12 17V18.5M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z"
+                  stroke={isDarkTheme ? "white" : "black"}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <SidebarLabel className={isDarkTheme ? "dark" : "light"}>
+                Price
+              </SidebarLabel>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <path
+                  d="M5 12H19"
+                  stroke={isDarkTheme ? "white" : "black"}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </Stack>
+            <TokenSelect
+              filter={(t: TokenType) => listCurencies.includes(t.contractId)}
+              onChange={(newValue: any) => {
+                if (!newValue) {
+                  setCurrency("");
+                  return;
+                }
+                const currency = `${newValue?.contractId || "0"}`;
+                if (currency === "0") {
+                  const CTC_INFO_WVOI = 34099056;
+                  setCurrency(`0,${CTC_INFO_WVOI}`);
+                } else {
+                  setCurrency(`${newValue?.contractId}`);
+                }
+              }}
+            />
+            <PriceRangeContainer>
+              <Min>
+                <MinInputContainer className={isDarkTheme ? "dark" : "light"}>
+                  <MinInputLabelContainer>
+                    <input
+                      placeholder="Min"
+                      onChange={(e) => {
+                        if (
+                          e.target.value === "" &&
+                          isNaN(parseInt(e.target.value))
+                        )
+                          return;
+                        debouncedMin(e.target.value);
+                      }}
+                      style={{
+                        color: isDarkTheme ? "white" : "black",
+                        width: "100%",
+                      }}
+                      type="text"
+                    />
+                  </MinInputLabelContainer>
+                </MinInputContainer>
+              </Min>
+              <To>to</To>
+              <Min>
+                <MinInputContainer className={isDarkTheme ? "dark" : "light"}>
+                  <MinInputLabelContainer>
+                    <input
+                      placeholder="Max"
+                      onChange={(e) => {
+                        if (
+                          e.target.value !== "" &&
+                          isNaN(parseInt(e.target.value))
+                        )
+                          return;
+                        debouncedMax(e.target.value);
+                      }}
+                      style={{
+                        color: isDarkTheme ? "white" : "black",
+                        width: "100%",
+                      }}
+                      type="text"
+                    />
+                  </MinInputLabelContainer>
+                </MinInputContainer>
+              </Min>
+            </PriceRangeContainer>
+          </SidebarFilter>
+        </SidebarFilterContainer>
+      </div>
+
+      <div className="mt-auto pt-4">
+        <Stack
+          direction="row"
+          sx={{
+            justifyContent: "flex-start",
+            width: "100%",
+            gap: "12px",
+            marginBottom: "12px",
+          }}
+        >
+          <LayersIcon sx={{ color: isDarkTheme ? "white" : "black" }} />
+          <SidebarLabel className={isDarkTheme ? "dark" : "light"}>
+            Collections
+          </SidebarLabel>
+        </Stack>
+        <Autocomplete
+          multiple
+          size="small"
+          id="collection-filter"
+          options={collections?.filter((c) => c.totalSupply > 0) ?? []}
+          value={selectedCollections}
+          onChange={(event, newValue: CollectionData[]) => {
+            setSelectedCollections(newValue);
+          }}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              variant="outlined"
+              placeholder="Filter by collection"
+              size="small"
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  padding: "4px 8px",
+                  "& fieldset": {
+                    borderColor: isDarkTheme ? "#3b3b3b" : "#eaebf0",
+                  },
+                  "&:hover fieldset": {
+                    borderColor: isDarkTheme ? "#4b4b4b" : "#d0d0d0",
+                  },
+                  "&.Mui-focused fieldset": {
+                    borderColor: isDarkTheme ? "#4b4b4b" : "#93f",
+                  },
+                },
+                "& .MuiInputBase-input": {
+                  color: isDarkTheme ? "#fff" : "#000",
+                  padding: "4px 8px",
+                  fontSize: "0.875rem",
+                },
+                "& .MuiAutocomplete-endAdornment": {
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                },
+              }}
+            />
+          )}
+          renderTags={(value, getTagProps) =>
+            value.map((collection, index) => (
+              <Chip
+                size="small"
+                label={getCollectionName(collection)}
+                {...getTagProps({ index })}
+                sx={{
+                  height: "20px",
+                  fontSize: "0.75rem",
+                  backgroundColor: isDarkTheme ? "#2b2b2b" : "#f5f5f5",
+                  color: isDarkTheme ? "#fff" : "#000",
+                  "& .MuiChip-deleteIcon": {
+                    width: "16px",
+                    height: "16px",
+                    color: isDarkTheme ? "#fff" : "#000",
+                  },
+                }}
               />
-            </svg>
-          </Stack>
-          <TokenSelect
-            filter={(t: TokenType) => listCurencies.includes(t.contractId)}
-            onChange={(newValue: any) => {
-              if (!newValue) {
-                setCurrency("");
-                return;
-              }
-              const currency = `${newValue?.contractId || "0"}`;
-              if (currency === "0") {
-                const CTC_INFO_WVOI = 34099056;
-                setCurrency(`0,${CTC_INFO_WVOI}`);
-              } else {
-                setCurrency(`${newValue?.contractId}`);
-              }
-            }}
-          />
-          <PriceRangeContainer>
-            <Min>
-              <MinInputContainer className={isDarkTheme ? "dark" : "light"}>
-                <MinInputLabelContainer>
-                  <input
-                    placeholder="Min"
-                    onChange={(e) => {
-                      if (
-                        e.target.value === "" &&
-                        isNaN(parseInt(e.target.value))
-                      )
-                        return;
-                      debouncedMin(e.target.value);
-                    }}
-                    style={{
-                      color: isDarkTheme ? "white" : "black",
-                      width: "100%",
-                    }}
-                    type="text"
-                  />
-                </MinInputLabelContainer>
-              </MinInputContainer>
-            </Min>
-            <To>to</To>
-            <Min>
-              <MinInputContainer className={isDarkTheme ? "dark" : "light"}>
-                <MinInputLabelContainer>
-                  <input
-                    placeholder="Max"
-                    onChange={(e) => {
-                      if (
-                        e.target.value !== "" &&
-                        isNaN(parseInt(e.target.value))
-                      )
-                        return;
-                      debouncedMax(e.target.value);
-                    }}
-                    style={{
-                      color: isDarkTheme ? "white" : "black",
-                      width: "100%",
-                    }}
-                    type="text"
-                  />
-                </MinInputLabelContainer>
-              </MinInputContainer>
-            </Min>
-          </PriceRangeContainer>
-        </SidebarFilter>
-      </SidebarFilterContainer>
-      <SidebarFilterContainer>
-        <SidebarFilter>
-          <Stack
-            direction="row"
-            sx={{
-              justifyContent: "flex-start",
-              width: "100%",
-              gap: "12px",
-            }}
-          >
-            <LayersIcon />
-            <SidebarLabel className={isDarkTheme ? "dark" : "light"}>
-              Collection
-            </SidebarLabel>
-            {/*<svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-            >
-              <path
-                d="M5 12H19"
-                stroke={isDarkTheme ? "white" : "black"}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-          </svg>*/}
-          </Stack>
-          <CollectionSelect
-            filter={(c: any) => {
-              return listCollectionIds.includes(c.contractId);
-            }}
-            onChange={(newValue: any) => {
-              if (!newValue) {
-                setCollection("");
-                return;
-              }
-              setCollection(`${newValue?.contractId}`);
-            }}
-          />
-        </SidebarFilter>
-      </SidebarFilterContainer>
+            ))
+          }
+          getOptionLabel={(collection) => getCollectionName(collection)}
+          isOptionEqualToValue={(option, value) =>
+            option.contractId === value.contractId
+          }
+          filterSelectedOptions
+          componentsProps={{
+            popper: {
+              placement: "top-start",
+              style: { maxHeight: "200px" },
+            },
+          }}
+        />
+      </div>
     </SidebarFilterRoot>
   );
 
@@ -893,10 +1038,77 @@ export const Listings: React.FC = () => {
           Buy
         </HeadingTitle>
         <HeadingDescriptionContainer>
-          <HeadingDescription>// {showing} Results</HeadingDescription>
+          <HeadingDescription>
+            // {filteredListings.length} Results
+          </HeadingDescription>
         </HeadingDescriptionContainer>
       </HeadingContainer>
+      <div className="flex items-center">
+        <TimeFilterContainer>
+          <FormControl size="small">
+            <StyledSelect
+              value={timeFilter}
+              onChange={(event) => {
+                // Cast the event value to the correct type
+                const value = event.target.value;
+                if (value === "24h" || value === "7d" || value === "all") {
+                  dispatch(setTimeFilter(value));
+                }
+              }}
+              theme={{ isDarkTheme }}
+            >
+              <MenuItem value="24h">Last 24 hours</MenuItem>
+              <MenuItem value="7d">Last 7 days</MenuItem>
+              <MenuItem value="all">All time</MenuItem>
+            </StyledSelect>
+          </FormControl>
+        </TimeFilterContainer>
+        <StyledToggleButtonGroup
+          value={viewMode}
+          exclusive
+          onChange={handleViewChange}
+          aria-label="view mode"
+          size="small"
+          theme={{ isDarkTheme }}
+        >
+          <ToggleButton value="grid" aria-label="grid view">
+            <GridView sx={{ color: isDarkTheme ? "#fff" : "inherit" }} />
+          </ToggleButton>
+          <ToggleButton value="list" aria-label="list view">
+            <List sx={{ color: isDarkTheme ? "#fff" : "inherit" }} />
+          </ToggleButton>
+        </StyledToggleButtonGroup>
+      </div>
     </ListingHeading>
+  );
+
+  useEffect(() => {
+    setDisplayedItems(filteredListings.slice(0, itemsPerLoad));
+    setHasMore(filteredListings.length > itemsPerLoad);
+  }, [filteredListings]);
+
+  const fetchMoreData = () => {
+    const currentLength = displayedItems.length;
+    const nextItems = filteredListings.slice(
+      currentLength,
+      currentLength + itemsPerLoad
+    );
+
+    if (nextItems.length > 0) {
+      setDisplayedItems((prev) => [...prev, ...nextItems]);
+      setHasMore(currentLength + nextItems.length < filteredListings.length);
+    } else {
+      setHasMore(false);
+    }
+  };
+
+  const isLoading = useMemo(
+    () =>
+      !listings ||
+      !smartTokens ||
+      listingsStatus !== "success" ||
+      collectionsLoading,
+    [listings, smartTokens, listingsStatus, collectionsLoading]
   );
 
   if (isLoading) {
@@ -928,55 +1140,56 @@ export const Listings: React.FC = () => {
   }
   return (
     <Layout>
-      <ListingRoot className="!flex !flex-col lg:!flex-row !items-center md:!items-start">
-        <div className="!hidden sm:!block">{renderSidebar}</div>
-        <div className="sm:!hidden w-full">
+      <ListingRoot className="!flex !flex-col lg:!flex-row !items-start">
+        <div className="!hidden lg:!block !sticky !top-[88px] !h-[calc(100vh-88px)]">
+          {renderSidebar}
+        </div>
+        <div className="lg:!hidden w-full">
           <DialogSearch>{renderSidebar}</DialogSearch>
         </div>
-        <ListingContainer>
+        <ListingContainer viewMode={viewMode}>
           {renderHeading}
-          <div className=" items-center flex flex-col sm:grid md:grid-cols-2 xl:grid-cols-3 sm:w-fit gap-4 sm:gap-2">
-            {filteredListings
-              .slice(0, showing)
-              .map((el: NFTIndexerListingI) => {
-                const pk = `${el.mpContractId}-${el.mpListingId}`;
-                const listedToken = {
-                  ...el.token,
-                  metadataURI: stripTrailingZeroBytes(el.token.metadataURI),
-                };
-                return (
-                  <Grid2 key={pk}>
-                    <CartNftCard
-                      token={listedToken}
-                      listing={el}
-                      onClick={() => {
-                        navigate(
-                          `/collection/${el.token.contractId}/token/${el.token.tokenId}`
-                        );
-                      }}
-                    />
-                  </Grid2>
-                );
-              })}
-            {
-              <Grid2>
-                <div
-                  onClick={() => setShowing(showing + 50)}
-                  className={`${
-                    isDarkTheme ? "button-dark" : "button-light"
-                  } cursor-pointer`}
-                >
-                  <div
-                    className={
-                      isDarkTheme ? "button-text-dark" : "button-text-light"
-                    }
-                  >
-                    View More
-                  </div>
-                </div>
-              </Grid2>
+          <InfiniteScroll
+            dataLength={displayedItems.length}
+            next={fetchMoreData}
+            hasMore={hasMore}
+            loader={
+              <div className="w-full flex justify-center p-4">
+                <GridLoader
+                  size={30}
+                  color={isDarkTheme ? "#fff" : "#000"}
+                  className="!text-primary"
+                />
+              </div>
             }
-          </div>
+            className={
+              viewMode === "grid"
+                ? "items-center flex flex-col sm:grid md:grid-cols-2 lg:grid-cols-3 sm:w-fit gap-4 sm:gap-2"
+                : "flex flex-col gap-4"
+            }
+          >
+            {displayedItems.map((el: NFTIndexerListingI) => {
+              const pk = `${el.mpContractId}-${el.mpListingId}`;
+              const listedToken = {
+                ...el.token,
+                metadataURI: stripTrailingZeroBytes(el.token.metadataURI),
+              };
+              return (
+                <Grid2 key={pk} className={viewMode === "list" ? "w-full" : ""}>
+                  <CartNftCard
+                    token={listedToken}
+                    listing={el}
+                    viewMode={viewMode}
+                    onClick={() => {
+                      navigate(
+                        `/collection/${el.token.contractId}/token/${el.token.tokenId}`
+                      );
+                    }}
+                  />
+                </Grid2>
+              );
+            })}
+          </InfiniteScroll>
         </ListingContainer>
       </ListingRoot>
     </Layout>
@@ -1007,3 +1220,74 @@ const DialogSearch = ({ children }: { children: ReactNode }) => {
     </Dialog>
   );
 };
+
+const StyledToggleButtonGroup = styled(ToggleButtonGroup)`
+  && {
+    .MuiToggleButton-root {
+      border-color: ${(props) =>
+        props.theme.isDarkTheme ? "#3b3b3b" : "rgba(0, 0, 0, 0.12)"};
+      color: ${(props) =>
+        props.theme.isDarkTheme ? "#fff" : "rgba(0, 0, 0, 0.54)"};
+
+      &.Mui-selected {
+        background-color: ${(props) =>
+          props.theme.isDarkTheme ? "#2b2b2b" : "rgba(0, 0, 0, 0.08)"};
+        color: ${(props) =>
+          props.theme.isDarkTheme ? "#fff" : "rgba(0, 0, 0, 0.54)"};
+
+        &:hover {
+          background-color: ${(props) =>
+            props.theme.isDarkTheme ? "#3b3b3b" : "rgba(0, 0, 0, 0.12)"};
+        }
+      }
+
+      &:hover {
+        background-color: ${(props) =>
+          props.theme.isDarkTheme ? "#2b2b2b" : "rgba(0, 0, 0, 0.04)"};
+      }
+    }
+  }
+`;
+
+const TimeFilterContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: 16px;
+`;
+
+const StyledSelect = styled(Select)`
+  && {
+    height: 36px;
+    min-width: 120px;
+    border-radius: 4px;
+    font-size: 14px;
+
+    .MuiSelect-select {
+      padding: 6px 12px;
+      color: ${(props) => (props.theme.isDarkTheme ? "#fff" : "#161717")};
+      display: flex;
+      align-items: center;
+      height: 20px;
+    }
+
+    .MuiOutlinedInput-notchedOutline {
+      border-color: ${(props) =>
+        props.theme.isDarkTheme ? "#3b3b3b" : "#eaebf0"};
+    }
+
+    &:hover .MuiOutlinedInput-notchedOutline {
+      border-color: ${(props) =>
+        props.theme.isDarkTheme ? "#4b4b4b" : "#d0d0d0"};
+    }
+
+    &.Mui-focused .MuiOutlinedInput-notchedOutline {
+      border-color: ${(props) =>
+        props.theme.isDarkTheme ? "#4b4b4b" : "#93f"};
+    }
+
+    svg {
+      color: ${(props) => (props.theme.isDarkTheme ? "#fff" : "#161717")};
+    }
+  }
+`;

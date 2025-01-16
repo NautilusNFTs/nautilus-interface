@@ -262,7 +262,8 @@ const NFTListingTableRow: React.FC<NFTListingTableRowProps> = ({ listing }) => {
   };
 
   return (
-    !loadingStakingContractData && (
+    !loadingStakingContractData &&
+    stakingContractData[0] && (
       <>
         <StyledTableRow>
           <StyledTableCell
@@ -355,6 +356,8 @@ const NFTListingTable: React.FC<Props> = ({
   enableSelect = false,
   onSelect = (x) => {},
 }) => {
+  console.log({ listings });
+
   const { isDarkTheme } = useSelector((state: RootState) => state.theme);
   type SortOption =
     | "discount-asc"

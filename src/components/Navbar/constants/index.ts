@@ -1,6 +1,6 @@
 export const navlinks = [
   {
-    label: "Buy",
+    label: "Listings",
     href: "/listing",
   },
   {
@@ -9,12 +9,21 @@ export const navlinks = [
   },
   {
     label: "Staking",
-    href: "/collection/421076/",
+    href: "/staking",
+  },
+  {
+    label: "Launchpad",
+    href: "/create-arc200",
+  },
+  {
+    label: "Community Chest",
+    href: "/community-chest",
   },
 ];
 
 export const linkLabels: any = {
   "/collection": "Collections",
   "/listing": "Buy",
-  "/collection/421076": "Staking",
+  "/staking": "Staking",
+  "/community-chest": "Community Chest",
 };

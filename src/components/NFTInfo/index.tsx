@@ -18,7 +18,7 @@ import { toast } from "react-toastify";
 
 import algosdk from "algosdk";
 //import { MarketplaceContext } from "../../store/MarketplaceContext";
-import { decodePrice, decodeTokenId } from "../../utils/mp";
+import { compactAddress, decodePrice, decodeTokenId } from "../../utils/mp";
 import NftCard from "../../components/NFTCard";
 import BuySaleModal, { multiplier } from "../../components/modals/BuySaleModal";
 // @ts-ignore
@@ -32,9 +32,8 @@ import ViaIcon from "/src/static/crypto-icons/voi/6779767.svg";
 import XIcon from "/src/static/icon/icon-x.svg";
 import DiscordIcon from "/src/static/icon/icon-discord.svg";
 import LinkIcon from "/src/static/icon/icon-link.svg";
-import NFTTabs from "../../components/NFTTabs";
 import ListSaleModal from "../modals/ListSaleModal";
-import { QUEST_ACTION, getActions, submitAction } from "../../config/quest";
+//import { QUEST_ACTION, getActions, submitAction } from "../../config/quest";
 import { getSmartTokens } from "../../store/smartTokenSlice";
 import { UnknownAction } from "@reduxjs/toolkit";
 import { NFTIndexerListingI, TokenType } from "../../types";
@@ -44,6 +43,7 @@ import { useWallet } from "@txnlab/use-wallet-react";
 import { TOKEN_WVOI } from "@/contants/tokens";
 import { useAccountInfo } from "../Navbar/hooks";
 import { useStakingContract } from "@/hooks/staking";
+import { useEnvoiResolver } from "@/hooks/useEnvoiResolver";
 
 const formatter = Intl.NumberFormat("en", { notation: "compact" });
 
@@ -259,6 +259,7 @@ interface NFTInfoProps {
   collectionInfo: any;
   loading: boolean;
   exchangeRate: number;
+  collectionName?: string;
 }
 
 export const NFTInfo: React.FC<NFTInfoProps> = ({
@@ -267,11 +268,12 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
   collectionInfo,
   loading,
   exchangeRate,
+  collectionName,
 }) => {
-  console.log({ nft, collection, collectionInfo, loading, exchangeRate });
-
   /* Wallet */
   const { activeAccount, signTransactions } = useWallet();
+  // EnVoi
+  const resolver = useEnvoiResolver();
   /* Modal */
   const [openBuyModal, setOpenBuyModal] = React.useState(false);
   const [isBuying, setIsBuying] = React.useState(false);
@@ -347,7 +349,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
       await algodClient.sendRawTransaction(stxns as Uint8Array[]).do();
       toast.success("Unlist successful!");
     } catch (e: any) {
-      console.log(e);
       toast.error(e.message);
     } finally {
     }
@@ -631,8 +632,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
         // -----------------------------------------
         const customR = await ci.custom();
 
-        console.log({ customR });
-
         if (!customR.success) {
           throw new Error("failed in simulate");
         }
@@ -738,7 +737,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
           const addrs = [];
           for (const addr of candidates) {
             const hasBalanceR = await ciArc200.hasBalance(addr);
-            console.log({ addr, hasBalanceR });
 
             if (!hasBalanceR.success) {
               throw new Error("hasBalance failed in simulate");
@@ -764,8 +762,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
             ci.setPaymentAmount(28500);
             ci.setExtraTxns(customTxns);
             const customR = await ci.custom();
-
-            console.log({ customR });
 
             if (!customR.success) {
               throw new Error("failed in simulate");
@@ -840,8 +836,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
           customPaymentAmount.reduce((acc, val) => acc + val, 0)
         );
         const customR = await ci.custom();
-
-        console.log({ customR });
 
         if (!customR.success) {
           throw new Error("failed in simulate");
@@ -1295,12 +1289,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
     );
   }, [activeAccount, manager, nft.listing]);
 
-  const {
-    data: accInfo,
-    isLoading: isBalanceLoading,
-    refetch: refetchBalance,
-  } = useAccountInfo();
-
   const { data: stakingAccountData, isLoading: isLoadingStakingAccountData } =
     useStakingContract(nft.tokenId);
 
@@ -1538,7 +1526,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
       //   //  throw new Error("Unsupported currency!");
       //   //}
       // }
-      console.log(nft.listing);
       setOpenBuyModal(true);
     } catch (e: any) {
       console.log(e);
@@ -1549,7 +1536,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
   const currency = smartTokens?.find(
     (el: TokenType) => `${el.contractId}` === `${nft.listing?.currency}`
   );
-  console.log({ currency, smartTokens, nft });
   const currencySymbol =
     currency?.tokenId === "0" ? "VOI" : currency?.symbol || "VOI";
   const currencyDecimals =
@@ -1559,8 +1545,6 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
   );
   const price = formatter.format(priceBn.toNumber());
   const priceAU = new BigNumber(nft.listing?.price).toFixed(0);
-
-  console.log({ currency, currencySymbol, currencyDecimals, price, nft });
 
   const displayImage =
     (nft.metadata?.image || "").indexOf("ipfs://") >= 0
@@ -1575,21 +1559,42 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
         )}`
       : collection[0]?.metadata?.image;
 
-  const displayName = (nft.metadata?.name || "").match(/[0-9]/)
-    ? nft.metadata?.name
-    : nft.metadata?.name + " #" + nft.tokenId;
+  const displayName =
+    nft?.collectionName || (nft.metadata?.name || "").match(/[0-9]/)
+      ? nft.metadata?.name
+      : nft.metadata?.name + " #" + nft.tokenId;
 
+  const [loadingOwnerProfile, setLoadingOwnerProfile] = useState(false);
   const [owner, setOwner] = useState<string | undefined>(nft.owner);
+  const [ownerName, setOwnerName] = useState<string>("");
+  const [ownerProfile, setOwnerProfile] = useState<any>(null);
   useEffect(() => {
     if (!nft) return;
+    setLoadingOwnerProfile(true);
     const ci = new arc72(nft.contractId, algodClient, indexerClient);
-    ci.arc72_ownerOf(nft.tokenId).then((res: any) => {
-      console.log({ res });
+    const tokenId = Number(nft.tokenId);
+    ci.arc72_ownerOf(tokenId).then((res: any) => {
       if (res.success) {
-        setOwner(res.returnValue);
+        const owner = res.returnValue;
+        setOwner(owner);
+        resolver.http.getNameFromAddress(owner).then((res) => {
+          if (!!res) {
+            setOwnerName(res);
+            resolver.http.search(res).then((res) => {
+              if (res.length === 1) {
+                setOwnerProfile(res[0]);
+                setLoadingOwnerProfile(false);
+              }
+            });
+          } else {
+            setOwnerName(compactAddress(owner));
+            setLoadingOwnerProfile(false);
+          }
+        });
       }
     });
   }, [nft]);
+  console.log({ loadingOwnerProfile, ownerName, ownerProfile });
 
   const discount = useMemo(() => {
     if (
@@ -1600,10 +1605,10 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
       stakingAccountData.length === 0
     )
       return 0;
-    const [stakingAccount] = stakingAccountData;
     const priceN = new BigNumber(priceAU).div(1e6).toNumber();
-    const totalN = Number(stakingAccount?.global_total);
-    return formatter.format(totalN);
+    const totalN = Number(stakingAccountData?.global_total) / 1e6;
+
+    return priceN < totalN ? formatter.format(totalN) : "";
   }, [nft, priceAU, stakingAccountData, isLoadingStakingAccountData]);
 
   return !loading ? (
@@ -1664,7 +1669,8 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
                       navigate(`/collection/${nft.contractId}`);
                     }}
                   >
-                    {collectionInfo?.project?.title ||
+                    {nft?.collectionName ||
+                      collectionInfo?.project?.title ||
                       nft.metadata?.name?.replace(/[#0123456789 ]*$/, "") ||
                       ""}
                   </span>
@@ -1673,9 +1679,12 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
               <NFTName style={{ color: isDarkTheme ? "#FFFFFF" : undefined }}>
                 {displayName}
               </NFTName>
-              {nft.owner ? (
+              {loadingOwnerProfile ? (
+                <Skeleton variant="text" width={150} height={24} />
+              ) : (
                 <AvatarWithOwnerName direction="row" style={{ gap: "6px" }}>
                   <Avatar
+                    src={ownerProfile?.metadata?.avatar || undefined}
                     sx={{
                       height: "24px",
                       width: "24px",
@@ -1694,13 +1703,11 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
                           isDarkTheme ? "owner-value-dark" : "owner-value-light"
                         }
                       >
-                        {nft.owner.slice(0, 4)}...{nft.owner.slice(-4)}
+                        {ownerName}
                       </OwnerValue>
                     </StyledLink>
                   </Stack>
                 </AvatarWithOwnerName>
-              ) : (
-                <Skeleton variant="text" width={150} height={24} />
               )}
 
               <ProjectLinkContainer>
@@ -1862,15 +1869,14 @@ export const NFTInfo: React.FC<NFTInfoProps> = ({
                         </Button>
                       </>
                     )
-                  ) : nft.owner === activeAccount?.address ? null : /*
+                  ) : nft.owner === activeAccount?.address ? null /*
                     <Button
                       variant="text"
                       onClick={() => setOpenListSale(true)}
                     >
                       List for Sale
                     </Button>
-                    */
-                  null}
+                    */ : null}
                   {false && (
                     <OfferButton src={ButtonOffer} alt="Offer Button" />
                   )}

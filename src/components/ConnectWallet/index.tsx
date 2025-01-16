@@ -4,7 +4,7 @@ import styled from "styled-components";
 import { Box, Divider, MenuItem, Select, Typography } from "@mui/material";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   QUEST_ACTION,
   QUEST_API,
@@ -14,6 +14,14 @@ import {
 import { useWallet } from "@txnlab/use-wallet-react";
 import { ArrowDownward } from "@mui/icons-material";
 import { currentVersion, deploymentVersion } from "@/contants/versions";
+import { getAlgorandClients } from "@/wallets";
+import { CONTRACT } from "ulujs";
+import { namehash } from "@/lib/utils";
+import { stripTrailingZeroBytes } from "@/utils/string";
+import { useName } from "@/hooks/useName";
+import { useEnvoiResolver } from "@/hooks/useEnvoiResolver";
+import { useEffect } from "react";
+import { compactAddress } from "@/utils/mp";
 
 const WalletIcon2 = () => {
   return (
@@ -317,6 +325,7 @@ interface OuterConnectButtonProps {
   theme: "light" | "dark";
 }
 const OuterConnectButton: React.FC<OuterConnectButtonProps> = ({ theme }) => {
+  const navigate = useNavigate();
   return theme === "dark" ? (
     <svg
       width="159"
@@ -466,6 +475,21 @@ function BasicMenu() {
     setAnchorEl(null);
   };
 
+  const resolver = useEnvoiResolver();
+
+  const [loading, setLoading] = React.useState(false);
+  const [displayName, setDisplayName] = React.useState("");
+  useEffect(() => {
+    if (!activeAccount || !resolver) return;
+    setLoading(true);
+    resolver.http
+      .getNameFromAddress(activeAccount?.address)
+      .then((res: any) => {
+        setDisplayName(!!res ? res : compactAddress(activeAccount.address));
+        setLoading(false);
+      });
+  }, [activeAccount, resolver]);
+
   // ---------------------------------------------
   // QUEST
   // ---------------------------------------------
@@ -511,10 +535,16 @@ function BasicMenu() {
           }}
         >
           <AccountDropdownLabel className="light">
-            {activeAccount?.address.slice(0, 4)}...
-            {activeAccount?.address.slice(-4)}
+            {loading ? "Loading..." : displayName}
           </AccountDropdownLabel>
-          <StyledWalletIcon />
+          <Link
+            to={`/wallet/${activeAccount?.address}`}
+            onClick={(e: any) => {
+              e.stopPropagation();
+            }}
+          >
+            <StyledWalletIcon />
+          </Link>
         </AccountDropdown>
       )}
       <AccountMenu

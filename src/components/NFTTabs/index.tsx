@@ -126,7 +126,9 @@ const NFTTabs: React.FC<NFTTabsProps> = ({ nft, loading, exchangeRate }) => {
             label="History"
             {...a11yProps(0)}
           />
-          <Tab label="Staking Information" {...a11yProps(1)} />
+          {stakingAccountData && (
+            <Tab label="Staking Information" {...a11yProps(1)} />
+          )}
           {/*<Tab label="Information" {...a11yProps(1)} />
           <Tab label="Attributes" {...a11yProps(2)} />*/}
         </Tabs>
@@ -180,7 +182,7 @@ const NFTTabs: React.FC<NFTTabsProps> = ({ nft, loading, exchangeRate }) => {
         )}
       </CustomTabPanel>
       <CustomTabPanel value={value} index={1}>
-        <StakingInformation contractId={nft.tokenId} />
+        <StakingInformation contractId={Number(nft.tokenId)} />
       </CustomTabPanel>
       {/*<CustomTabPanel value={value} index={1}>
         Information
